@@ -1,7 +1,7 @@
 bl_info = {
     "name" : "VRC Facetracking Shapekeys",
     "author" : "Adjerry91",
-    "version" : (0,2,0),
+    "version" : (0,3,0),
     "blender" : (3,0,0),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -10,6 +10,17 @@ bl_info = {
 }
 
 import bpy
+
+from bpy.types import (Menu, Operator, Panel, PropertyGroup)
+from bpy.props import (BoolProperty, IntProperty, StringProperty, BoolVectorProperty, EnumProperty, PointerProperty)
+
+blender_version = bool(bpy.app.version >= (2, 80, 0))
+
+if blender_version:
+    user_preferences = bpy.context.preferences
+else:
+    bl_info['blender'] = (2, 79, 0)
+    user_preferences = bpy.context.user_preferences
 
 # -------------------------------------------------------------------
 # VRChat Facetracking Shapekey List   
@@ -22,10 +33,6 @@ VRCFT_Labels = [
             "EyesWiden",
             "EyesDilation",
             "EyesSqueeze",
-            "LeftEyeX",
-            "RightEyeX",
-            "LeftEyeY",
-            "RightEyeY",
             "LeftEyeWiden",
             "RightEyeWiden",
             "LeftEyeSqueeze",
@@ -70,23 +77,86 @@ VRCFT_Labels = [
         ]
 
 # -------------------------------------------------------------------
-# Helper    
+# Shape Key Operators    
+# -------------------------------------------------------------------    
+
+class VRCFT_CreateShapeKeys(bpy.types.Operator):
+    """Creates VRChat Facetracking Shapekeys"""
+    bl_label = "Create VRChat Facetracking Shape Keys"
+    bl_idname = "vrcft.create_shapekeys"
+
+    def execute(self, context):
+
+        object = bpy.context.object
+        scene = context.scene
+        vrcft_tools = scene.vrcft_tools
+        active_object = bpy.context.active_object
+
+        #Check if there is shape keys on the mesh
+        if context.object.data.shape_keys:
+
+            #Create beginning seperation marker for VRCFT Shape Keys
+            object.shape_key_add(name="~~ VRCFacetracking ~~",from_mix=False)
+
+            #Clear all existing values for shape keys
+            bpy.ops.object.shape_key_clear()
+
+            for x in range(len(VRCFT_Labels)):
+                curr_key = eval("vrcft_tools.shapekey_" + str(x))
+                if curr_key == "Basis":
+                    object.shape_key_add(name=VRCFT_Labels[x], from_mix=False)
+                else:
+                    # Find shapekey enterred and mix to create new shapekey
+                    active_object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(
+                        curr_key)
+                    object.data.shape_keys.key_blocks[curr_key].value = 1
+                    object.shape_key_add(name=VRCFT_Labels[x], from_mix=True)
+                    bpy.ops.object.shape_key_clear()
+
+            #Create end seperation marker for VRCFT Shape Keys
+            object.shape_key_add(name="~~ END OF VRCFacetracking ~~",from_mix=False)
+            self.report({'INFO'}, "VRC Facetracking Shapekeys have been created")
+        else:
+            #Error message if basis does not exist
+            self.report({'WARNING'}, "No shape keys found on mesh")
+        return{'FINISHED'}
+
+# -------------------------------------------------------------------
+# User Interface  
 # -------------------------------------------------------------------
 
-def shape_key_selection(op, context):
-    shape_key_names = []
+class VRCFT_UI(Panel):
+    bl_label = "VRChat Facetracking"
+    bl_idname = "VRCFT"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "VRCFT"
 
-    for shapekey in context.object.data.shape_keys.key_blocks:
-        shape_key_names.append(shapekey.name)
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        vrcft_tools = scene.vrcft_tools
 
-    return shape_key_names
+        object = bpy.context.object
 
+        box = layout.box()
+        col = box.column(align=True)
+
+        #Start List of Shapekeys from VRCFT labels list
+        for i in range(1,len(VRCFT_Labels)-1,1):
+            row = col.row(align=True)
+            row.scale_y = 1.1
+            row.label(text = VRCFT_Labels[i] + ":")
+            row.prop(vrcft_tools, 'shapekey_' + str(i), icon='SHAPEKEY_DATA')
+
+        row = layout.row()
+        row.operator("vrcft.create_shapekeys", icon='MESH_MONKEY')
 
 # -------------------------------------------------------------------
 # Properties    
 # -------------------------------------------------------------------
 
-class VRCFT_Properties(bpy.types.PropertyGroup):
+class VRCFT_Properties(PropertyGroup):
 
     #List of VRCFT Shapes variables to be used by UI
     #Must equal the VRCFT labels
@@ -139,142 +209,6 @@ class VRCFT_Properties(bpy.types.PropertyGroup):
     shapekey_44 : bpy.props.StringProperty(name = "", default = "Basis")
     shapekey_45 : bpy.props.StringProperty(name = "", default = "Basis")
     shapekey_46 : bpy.props.StringProperty(name = "", default = "Basis")
-    shapekey_47 : bpy.props.StringProperty(name = "", default = "Basis")
-    shapekey_48 : bpy.props.StringProperty(name = "", default = "Basis")
-    shapekey_49 : bpy.props.StringProperty(name = "", default = "Basis")
-    shapekey_50 : bpy.props.StringProperty(name = "", default = "Basis")
-
-
-# -------------------------------------------------------------------
-# Shape Key Operators    
-# -------------------------------------------------------------------    
-
-class VRCFT_CreateShapeKeys(bpy.types.Operator):
-    """Creates VRChat Facetracking Shapekeys"""
-    bl_label = "Create VRChat Facetracking Shape Keys"
-    bl_idname = "vrcft.create_shapekeys"
-
-    def execute(self, context):
-
-        object = bpy.context.object
-        scene = context.scene
-        vrcft_tools = scene.vrcft_tools
-        active_object = bpy.context.active_object
-
-        #Check if there is shape keys on the mesh
-        if context.object.data.shape_keys:
-
-            #Create beginning seperation marker for VRCFT Shape Keys
-            object.shape_key_add(name="~~ VRCFacetracking ~~",from_mix=False)
-
-            #Clear all existing values for shape keys
-            bpy.ops.object.shape_key_clear()
-
-            for x in range(len(VRCFT_Labels)):
-                curr_key = eval("vrcft_tools.shapekey_" + str(x))
-                if curr_key == "Basis":
-                    object.shape_key_add(name=VRCFT_Labels[x], from_mix=False)
-                else:
-                    # Find shapekey enterred and mix to create new shapekey
-                    active_object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(
-                        curr_key)
-                    object.data.shape_keys.key_blocks[curr_key].value = 1
-                    object.shape_key_add(name=VRCFT_Labels[x], from_mix=True)
-                    bpy.ops.object.shape_key_clear()
-
-            #Create end seperation marker for VRCFT Shape Keys
-            object.shape_key_add(name="~~ END OF VRCFacetracking ~~",from_mix=False)
-
-            #DEBUG REPORT STAT OF EACH OF THE CONTROLS
-#            self.report({'INFO'}, str(VRCFT_Labels[1]) + " mixed with " + str(vrcft_tools.shapekey_1))
-#            self.report({'INFO'}, str(VRCFT_Labels[2]) + " mixed with " + str(vrcft_tools.shapekey_2))
-#            self.report({'INFO'}, str(VRCFT_Labels[3]) + " mixed with " + str(vrcft_tools.shapekey_3))
-#            self.report({'INFO'}, str(VRCFT_Labels[4]) + " mixed with " + str(vrcft_tools.shapekey_4))
-#            self.report({'INFO'}, str(VRCFT_Labels[5]) + " mixed with " + str(vrcft_tools.shapekey_5))
-#            self.report({'INFO'}, str(VRCFT_Labels[6]) + " mixed with " + str(vrcft_tools.shapekey_6))
-#            self.report({'INFO'}, str(VRCFT_Labels[7]) + " mixed with " + str(vrcft_tools.shapekey_7))
-#            self.report({'INFO'}, str(VRCFT_Labels[8]) + " mixed with " + str(vrcft_tools.shapekey_8))
-#            self.report({'INFO'}, str(VRCFT_Labels[9]) + " mixed with " + str(vrcft_tools.shapekey_9))
-#            self.report({'INFO'}, str(VRCFT_Labels[10]) + " mixed with " + str(vrcft_tools.shapekey_10))
-#            self.report({'INFO'}, str(VRCFT_Labels[11]) + " mixed with " + str(vrcft_tools.shapekey_11))
-#            self.report({'INFO'}, str(VRCFT_Labels[12]) + " mixed with " + str(vrcft_tools.shapekey_12))
-#            self.report({'INFO'}, str(VRCFT_Labels[13]) + " mixed with " + str(vrcft_tools.shapekey_13))
-#            self.report({'INFO'}, str(VRCFT_Labels[14]) + " mixed with " + str(vrcft_tools.shapekey_14))
-#            self.report({'INFO'}, str(VRCFT_Labels[15]) + " mixed with " + str(vrcft_tools.shapekey_15))
-#            self.report({'INFO'}, str(VRCFT_Labels[16]) + " mixed with " + str(vrcft_tools.shapekey_16))
-#            self.report({'INFO'}, str(VRCFT_Labels[17]) + " mixed with " + str(vrcft_tools.shapekey_17))
-#            self.report({'INFO'}, str(VRCFT_Labels[18]) + " mixed with " + str(vrcft_tools.shapekey_18))
-#            self.report({'INFO'}, str(VRCFT_Labels[19]) + " mixed with " + str(vrcft_tools.shapekey_19))
-#            self.report({'INFO'}, str(VRCFT_Labels[20]) + " mixed with " + str(vrcft_tools.shapekey_20))
-#            self.report({'INFO'}, str(VRCFT_Labels[21]) + " mixed with " + str(vrcft_tools.shapekey_21))
-#            self.report({'INFO'}, str(VRCFT_Labels[22]) + " mixed with " + str(vrcft_tools.shapekey_22))
-#            self.report({'INFO'}, str(VRCFT_Labels[23]) + " mixed with " + str(vrcft_tools.shapekey_23))
-#            self.report({'INFO'}, str(VRCFT_Labels[24]) + " mixed with " + str(vrcft_tools.shapekey_24))
-#            self.report({'INFO'}, str(VRCFT_Labels[25]) + " mixed with " + str(vrcft_tools.shapekey_25))
-#            self.report({'INFO'}, str(VRCFT_Labels[26]) + " mixed with " + str(vrcft_tools.shapekey_26))
-#            self.report({'INFO'}, str(VRCFT_Labels[27]) + " mixed with " + str(vrcft_tools.shapekey_27))
-#            self.report({'INFO'}, str(VRCFT_Labels[28]) + " mixed with " + str(vrcft_tools.shapekey_28))
-#            self.report({'INFO'}, str(VRCFT_Labels[29]) + " mixed with " + str(vrcft_tools.shapekey_29))
-#            self.report({'INFO'}, str(VRCFT_Labels[30]) + " mixed with " + str(vrcft_tools.shapekey_30))
-#            self.report({'INFO'}, str(VRCFT_Labels[31]) + " mixed with " + str(vrcft_tools.shapekey_31))
-#            self.report({'INFO'}, str(VRCFT_Labels[32]) + " mixed with " + str(vrcft_tools.shapekey_32))
-#            self.report({'INFO'}, str(VRCFT_Labels[33]) + " mixed with " + str(vrcft_tools.shapekey_33))
-#            self.report({'INFO'}, str(VRCFT_Labels[34]) + " mixed with " + str(vrcft_tools.shapekey_34))
-#            self.report({'INFO'}, str(VRCFT_Labels[35]) + " mixed with " + str(vrcft_tools.shapekey_35))
-#            self.report({'INFO'}, str(VRCFT_Labels[36]) + " mixed with " + str(vrcft_tools.shapekey_36))
-#            self.report({'INFO'}, str(VRCFT_Labels[37]) + " mixed with " + str(vrcft_tools.shapekey_37))
-#            self.report({'INFO'}, str(VRCFT_Labels[38]) + " mixed with " + str(vrcft_tools.shapekey_38))
-#            self.report({'INFO'}, str(VRCFT_Labels[39]) + " mixed with " + str(vrcft_tools.shapekey_39))
-#            self.report({'INFO'}, str(VRCFT_Labels[40]) + " mixed with " + str(vrcft_tools.shapekey_40))
-#            self.report({'INFO'}, str(VRCFT_Labels[41]) + " mixed with " + str(vrcft_tools.shapekey_41))
-#            self.report({'INFO'}, str(VRCFT_Labels[42]) + " mixed with " + str(vrcft_tools.shapekey_42))
-#            self.report({'INFO'}, str(VRCFT_Labels[43]) + " mixed with " + str(vrcft_tools.shapekey_43))
-#            self.report({'INFO'}, str(VRCFT_Labels[44]) + " mixed with " + str(vrcft_tools.shapekey_44))
-#            self.report({'INFO'}, str(VRCFT_Labels[45]) + " mixed with " + str(vrcft_tools.shapekey_45))
-#            self.report({'INFO'}, str(VRCFT_Labels[46]) + " mixed with " + str(vrcft_tools.shapekey_46))
-#            self.report({'INFO'}, str(VRCFT_Labels[47]) + " mixed with " + str(vrcft_tools.shapekey_47))
-#            self.report({'INFO'}, str(VRCFT_Labels[48]) + " mixed with " + str(vrcft_tools.shapekey_48))
-#            self.report({'INFO'}, str(VRCFT_Labels[49]) + " mixed with " + str(vrcft_tools.shapekey_49))
-#            self.report({'INFO'}, str(VRCFT_Labels[50]) + " mixed with " + str(vrcft_tools.shapekey_50))
-#            self.report({'INFO'}, str(VRCFT_Labels[51]) + " mixed with " + str(vrcft_tools.shapekey_51))
-
-
-            self.report({'INFO'}, "VRC Facetracking Shapekeys have been created")
-        else:
-            #Error message if basis does not exist
-            self.report({'WARNING'}, "No shape keys found on mesh")
-        return{'FINISHED'}
-
-# -------------------------------------------------------------------
-# User Interface  
-# -------------------------------------------------------------------
-
-class VRCFT_UI(bpy.types.Panel):
-    bl_label = "VRChat Facetracking"
-    bl_idname = "VRCFT"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "VRCFT"
-
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-        vrcft_tools = scene.vrcft_tools
-
-        object = bpy.context.object
-
-        box = layout.box()
-        col = box.column(align=True)
-
-        #Start List of Shapekeys from VRCFT labels list
-        for i in range(1,len(VRCFT_Labels)-1,1):
-            row = col.row(align=True)
-            row.scale_y = 1.1
-            row.label(text = VRCFT_Labels[i] + ":")
-            row.prop(vrcft_tools, 'shapekey_' + str(i), icon='SHAPEKEY_DATA')
-
-        row = layout.row()
-        row.operator("vrcft.create_shapekeys", icon='MESH_MONKEY')
 
 # -------------------------------------------------------------------
 # Register
@@ -289,15 +223,12 @@ classes = (
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-
         bpy.types.Scene.vrcft_tools = bpy.props.PointerProperty(type=VRCFT_Properties)
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
-
         del bpy.types.Scene.vrcft_tools
-        del bpy.types.Scene.vrcft_shapekeys
 
 if __name__ == "__main__":
     register()
