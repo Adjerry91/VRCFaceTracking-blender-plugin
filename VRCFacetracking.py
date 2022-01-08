@@ -143,7 +143,7 @@ class VRCFT_UI(Panel):
         col = box.column(align=True)
 
         #Start List of Shapekeys from VRCFT labels list
-        for i in range(1,len(VRCFT_Labels)-1,1):
+        for i in range(len(VRCFT_Labels)):
             row = col.row(align=True)
             row.scale_y = 1.1
             row.label(text = VRCFT_Labels[i] + ":")
