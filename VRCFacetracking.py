@@ -1,7 +1,7 @@
 bl_info = {
     "name" : "VRC Facetracking Shapekeys",
     "author" : "Adjerry91",
-    "version" : (0,3,0),
+    "version" : (0,4,0),
     "blender" : (3,0,0),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -77,10 +77,24 @@ VRCFT_Labels = [
         ]
 
 # -------------------------------------------------------------------
+# Functions  
+# -------------------------------------------------------------------
+
+def duplicate_shapekey(string):
+    active_object = bpy.context.active_object
+    
+    #Check shape keys if duplicate
+    if active_object.data.shape_keys.key_blocks.find(string) >= 0:
+#        print("Duplicate shape key found!")       
+        return True
+    else:          
+        return False
+
+# -------------------------------------------------------------------
 # Shape Key Operators    
 # -------------------------------------------------------------------    
 
-class VRCFT_CreateShapeKeys(bpy.types.Operator):
+class VRCFT_OT_CreateShapeKeys(Operator):
     """Creates VRChat Facetracking Shapekeys"""
     bl_label = "Create VRChat Facetracking Shape Keys"
     bl_idname = "vrcft.create_shapekeys"
@@ -91,31 +105,58 @@ class VRCFT_CreateShapeKeys(bpy.types.Operator):
         scene = context.scene
         vrcft_tools = scene.vrcft_tools
         active_object = bpy.context.active_object
+        mesh = bpy.ops.mesh
+        ops = bpy.ops
 
         #Check if there is shape keys on the mesh
         if context.object.data.shape_keys:
-
+            
             #Create beginning seperation marker for VRCFT Shape Keys
-            object.shape_key_add(name="~~ VRCFacetracking ~~",from_mix=False)
-
+            if duplicate_shapekey("~~ VRCFacetracking ~~") == False :    
+                object.shape_key_add(name="~~ VRCFacetracking ~~", from_mix=False)
+                    
             #Clear all existing values for shape keys
             bpy.ops.object.shape_key_clear()
 
             for x in range(len(VRCFT_Labels)):
                 curr_key = eval("vrcft_tools.shapekey_" + str(x))
+                
+                #Check if blend with 'Basis' shape key
                 if curr_key == "Basis":
-                    object.shape_key_add(name=VRCFT_Labels[x], from_mix=False)
-                else:
-                    # Find shapekey enterred and mix to create new shapekey
-                    active_object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(
-                        curr_key)
-                    object.data.shape_keys.key_blocks[curr_key].value = 1
-                    object.shape_key_add(name=VRCFT_Labels[x], from_mix=True)
+                    #Check for duplicates
+                    if duplicate_shapekey(VRCFT_Labels[x]) == False :
+                        object.shape_key_add(name=VRCFT_Labels[x], from_mix=False)
+                    #Do not overwrite if the shape key exists and is on 'Basis'
+                        
+                else:                                     
+                    #Check for duplicates
+                    if duplicate_shapekey(VRCFT_Labels[x]) == False :
+                        # Find shapekey enterred and mix to create new shapekey
+                        active_object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
+                        object.data.shape_keys.key_blocks[curr_key].value = 1                      
+                        object.shape_key_add(name=VRCFT_Labels[x], from_mix=True)                        
+                    else:
+                        #Mix to existing shape key duplicate
+                        active_object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(VRCFT_Labels[x])
+                        ops.object.mode_set(mode='EDIT', toggle=False)
+                        mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
+                    #Clear shape key weights    
                     bpy.ops.object.shape_key_clear()
+                        
 
             #Create end seperation marker for VRCFT Shape Keys
-            object.shape_key_add(name="~~ END OF VRCFacetracking ~~",from_mix=False)
-            self.report({'INFO'}, "VRC Facetracking Shapekeys have been created")
+            if duplicate_shapekey("~~ END OF VRCFacetracking ~~") == False : 
+                object.shape_key_add(name="~~ END OF VRCFacetracking ~~",from_mix=False)
+                self.report({'INFO'}, "VRC facetracking shapekeys have been created")
+            else: 
+                self.report({'INFO'}, "Existing VRC facetracking shape keys have been overwritten")
+                
+            #Cleanup mode state
+            ops.object.mode_set(mode='OBJECT', toggle=False)
+            
+            #Move active shape to 'Basis'
+            active_object.active_shape_key_index = 0
+                
         else:
             #Error message if basis does not exist
             self.report({'WARNING'}, "No shape keys found on mesh")
@@ -125,7 +166,7 @@ class VRCFT_CreateShapeKeys(bpy.types.Operator):
 # User Interface  
 # -------------------------------------------------------------------
 
-class VRCFT_UI(Panel):
+class VRCFT_UL(Panel):
     bl_label = "VRChat Facetracking"
     bl_idname = "VRCFT"
     bl_space_type = 'VIEW_3D'
@@ -139,6 +180,11 @@ class VRCFT_UI(Panel):
 
         object = bpy.context.object
 
+        #Mesh Selection
+#        col = layout.column()
+#        col.prop_search(scene, "prop_obj", context.scene, "objects", text="Mesh")
+#        row = col.row(align=True)
+
         box = layout.box()
         col = box.column(align=True)
 
@@ -147,10 +193,18 @@ class VRCFT_UI(Panel):
             row = col.row(align=True)
             row.scale_y = 1.1
             row.label(text = VRCFT_Labels[i] + ":")
-            row.prop(vrcft_tools, 'shapekey_' + str(i), icon='SHAPEKEY_DATA')
-
+            row.prop(vrcft_tools, 'shapekey_' + str(i), icon='SHAPEKEY_DATA')       
+       
+        #Search for shape keys on mesh TEST CODE
+#        row = col.row(align=True)
+#        row.scale_y = 1.1
+#        row.label(text = "TEST:")
+#        row.prop_search(scene, "prop_ske", context.object.data.shape_keys, "shapekeys", text="", icon='SHAPEKEY_DATA')  
+               
         row = layout.row()
         row.operator("vrcft.create_shapekeys", icon='MESH_MONKEY')
+        
+     
 
 # -------------------------------------------------------------------
 # Properties    
@@ -216,19 +270,25 @@ class VRCFT_Properties(PropertyGroup):
 
 classes = (
     VRCFT_Properties,
-    VRCFT_CreateShapeKeys,
-    VRCFT_UI
+    VRCFT_OT_CreateShapeKeys,
+    VRCFT_UL
 )
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-        bpy.types.Scene.vrcft_tools = bpy.props.PointerProperty(type=VRCFT_Properties)
+    bpy.types.Scene.vrcft_tools = bpy.props.PointerProperty(type=VRCFT_Properties)
+        
+#    bpy.types.Scene.prop_obj = PointerProperty(type=bpy.types.Object)
+#    bpy.types.Scene.prop_ske = PointerProperty(type=bpy.types.ShapeKey)
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
-        del bpy.types.Scene.vrcft_tools
+    del bpy.types.Scene.vrcft_tools
+    
+#    del bpy.types.Scene.prop_obj
+#    del bpy.types.Scene.prop_ske  
 
 if __name__ == "__main__":
     register()
