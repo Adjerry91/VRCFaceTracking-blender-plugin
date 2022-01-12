@@ -1,7 +1,7 @@
 bl_info = {
     "name" : "VRC Facetracking Shapekeys",
     "author" : "Adjerry91",
-    "version" : (1,0,2),
+    "version" : (1,0,3),
     "blender" : (3,0,0),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -328,6 +328,8 @@ class VRCFT_OT_CreateShapeKeys(Operator):
                         object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(VRCFT_Labels[x])
                         object.data.shape_keys.key_blocks[curr_key].value = 1
                         ops.object.mode_set(mode='EDIT', toggle=False)
+                        bpy.ops.mesh.select_mode(type="VERT")
+                        ops.mesh.select_all(action='SELECT')
                         ops.mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
                         self.report({'INFO'}, "Existing VRC facetracking shape key: " + VRCFT_Labels[x] + " has been overwritten with: " + curr_key)
                     #Clear shape key weights    
