@@ -1,7 +1,7 @@
 bl_info = {
     "name" : "VRC Facetracking Shapekeys",
     "author" : "Adjerry91",
-    "version" : (1,0,0),
+    "version" : (1,0,1),
     "blender" : (3,0,0),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -230,7 +230,7 @@ def get_shapekeys(context, names, no_basis, decimation, return_list):
             choices.append((name, name, ''))
             choices_simple.append(name)
 
-    choices.sort(key=lambda x: tuple(x[0].lower()))
+#    choices.sort(key=lambda x: tuple(x[0].lower()))
 
     choices2 = []
     for name in names:
@@ -432,8 +432,58 @@ def unregister():
         
     # Shape keys
     del Scene.vrcft_mesh
-    for i in enumerate(VRCFT_Labels):    
-        delattr(Scene, "vrcft_shapekeys_" + str(i))
+#    for i in enumerate(VRCFT_Labels):  
+          
+    del Scene.vrcft_shapekeys_0
+    del Scene.vrcft_shapekeys_1
+    del Scene.vrcft_shapekeys_2
+    del Scene.vrcft_shapekeys_3
+    del Scene.vrcft_shapekeys_4
+    del Scene.vrcft_shapekeys_5
+    del Scene.vrcft_shapekeys_6
+    del Scene.vrcft_shapekeys_7
+    del Scene.vrcft_shapekeys_8
+    del Scene.vrcft_shapekeys_9
+    del Scene.vrcft_shapekeys_10
+    del Scene.vrcft_shapekeys_11
+    del Scene.vrcft_shapekeys_12
+    del Scene.vrcft_shapekeys_13
+    del Scene.vrcft_shapekeys_14
+    del Scene.vrcft_shapekeys_15
+    del Scene.vrcft_shapekeys_16
+    del Scene.vrcft_shapekeys_17
+    del Scene.vrcft_shapekeys_18
+    del Scene.vrcft_shapekeys_19
+    del Scene.vrcft_shapekeys_20
+    del Scene.vrcft_shapekeys_21
+    del Scene.vrcft_shapekeys_22
+    del Scene.vrcft_shapekeys_23
+    del Scene.vrcft_shapekeys_24
+    del Scene.vrcft_shapekeys_25
+    del Scene.vrcft_shapekeys_26
+    del Scene.vrcft_shapekeys_27
+    del Scene.vrcft_shapekeys_28
+    del Scene.vrcft_shapekeys_29
+    del Scene.vrcft_shapekeys_30
+    del Scene.vrcft_shapekeys_31
+    del Scene.vrcft_shapekeys_32
+    del Scene.vrcft_shapekeys_33
+    del Scene.vrcft_shapekeys_34
+    del Scene.vrcft_shapekeys_35
+    del Scene.vrcft_shapekeys_36
+    del Scene.vrcft_shapekeys_37
+    del Scene.vrcft_shapekeys_38
+    del Scene.vrcft_shapekeys_39
+    del Scene.vrcft_shapekeys_40
+    del Scene.vrcft_shapekeys_41
+    del Scene.vrcft_shapekeys_42
+    del Scene.vrcft_shapekeys_43
+    del Scene.vrcft_shapekeys_44
+    del Scene.vrcft_shapekeys_45
+    del Scene.vrcft_shapekeys_46
+#    del Scene.vrcft_shapekeys_47
+#    del Scene.vrcft_shapekeys_48
+#    del Scene.vrcft_shapekeys_49
         
 
 if __name__ == "__main__":
