@@ -33,6 +33,7 @@ VRCFT_Labels = [
             "CombinedEyeLid",
             "EyesWiden",
             "EyesDilation",
+            "EyesConstrict",
             "EyesSqueeze",
             "LeftEyeWiden",
             "RightEyeWiden",
@@ -297,7 +298,7 @@ class VRCFT_OT_CreateShapeKeys(Operator):
 
 
         #Check if there is shape keys on the mesh
-        if context.object.data.shape_keys: 
+        if object.data.shape_keys: 
             
             #Create beginning seperation marker for VRCFT Shape Keys
             if duplicate_shapekey("~~ VRCFacetracking ~~") == False :    
@@ -484,7 +485,7 @@ def unregister():
     del Scene.vrcft_shapekeys_44
     del Scene.vrcft_shapekeys_45
     del Scene.vrcft_shapekeys_46
-#    del Scene.vrcft_shapekeys_47
+    del Scene.vrcft_shapekeys_47
 #    del Scene.vrcft_shapekeys_48
 #    del Scene.vrcft_shapekeys_49
         
