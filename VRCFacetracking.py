@@ -1,7 +1,7 @@
 bl_info = {
     "name" : "VRC Facetracking Shapekeys",
     "author" : "Adjerry91",
-    "version" : (1,0,3),
+    "version" : (1,1,0),
     "blender" : (3,0,0),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -28,54 +28,60 @@ else:
 # -------------------------------------------------------------------
 
 VRCFT_Labels = [
-            "LeftEyeLid",
-            "RightEyeLid",
-            "CombinedEyeLid",
-            "EyesWiden",
-            "EyesDilation",
-            "EyesConstrict",
-            "EyesSqueeze",
-            "LeftEyeWiden",
-            "RightEyeWiden",
-            "LeftEyeSqueeze",
-            "RightEyeSqueeze",
-            "JawRight",
-            "JawLeft",
-            "JawForward",
-            "JawOpen",
-            "MouthApeShape",
-            "MouthUpperRight",
-            "MouthUpperLeft",
-            "MouthLowerRight",
-            "MouthLowerLeft",
-            "MouthUpperOverturn",
-            "MouthLowerOverturn",
-            "MouthPout",
-            "MouthSmileRight",
-            "MouthSmileLeft",
-            "MouthSadRight",
-            "MouthSadLeft",
-            "CheekPuffRight",
-            "CheekPuffLeft",
-            "CheekSuck",
-            "MouthUpperUpRight",
-            "MouthUpperUpLeft",
-            "MouthLowerDownRight",
-            "MouthLowerDownLeft",
-            "MouthUpperInside",
-            "MouthLowerInside",
-            "MouthLowerOverlay",
-            "TongueLongStep1",
-            "TongueLongStep2",
-            "TongueDown",
-            "TongueUp",
-            "TongueRight",
-            "TongueLeft",
-            "TongueRoll",
-            "TongueUpLeftMorph",
-            "TongueUpRightMorph",
-            "TongueDownLeftMorph",
-            "TongueDownRightMorph",
+            "Eye_Left_squeeze",
+            "Eye_Right_squeeze",
+            "Eye_Left_Blink",
+            "Eye_Left_Right",
+            "Eye_Left_Left",
+            "Eye_Left_Down",
+            "Eye_Left_Up",
+            "Eye_Right_Blink",
+            "Eye_Right_Blink",
+            "Eye_Right_Right",
+            "Eye_Right_Left",
+            "Eye_Right_Down",
+            "Eye_Right_Up",
+            "Eye_Left_Wide",
+            "Eye_Right_Wide",
+            "Eyes_Dilation",
+            "Eyes_Constrict",
+            "Jaw_Right",
+            "Jaw_Left",
+            "Jaw_Forward",
+            "Jaw_Open",
+            "Mouth_Ape_Shape",
+            "Mouth_Upper_Right",
+            "Mouth_Upper_Left",
+            "Mouth_Lower_Right",
+            "Mouth_Lower_Left",
+            "Mouth_Upper_Overturn",
+            "Mouth_Lower_Overturn",
+            "Mouth_Pout",
+            "Mouth_Smile_Right",
+            "Mouth_Smile_Left",
+            "Mouth_Sad_Right",
+            "Mouth_Sad_Left",
+            "Cheek_Puff_Right",
+            "Cheek_Puff_Left",
+            "Cheek_Suck",
+            "Mouth_Upper_UpRight",
+            "Mouth_Upper_UpLeft",
+            "Mouth_Lower_DownRight",
+            "Mouth_Lower_DownLeft",
+            "Mouth_Upper_Inside",
+            "Mouth_Lower_Inside",
+            "Mouth_Lower_Overlay",
+            "Tongue_LongStep1",
+            "Tongue_LongStep2",
+            "Tongue_Down",
+            "Tongue_Up",
+            "Tongue_Right",
+            "Tongue_Left",
+            "Tongue_Roll",
+            "Tongue_UpRight_Morph",
+            "Tongue_UpLeft_Morph",
+            "Tongue_DownRight_Morph",
+            "Tongue_DownLeft_Morph",   
         ]
 
 # -------------------------------------------------------------------
@@ -423,21 +429,17 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
       
-    # Shape keys
+    # Mesh Select
     Scene.vrcft_mesh = EnumProperty(name='Mesh',description='Mesh to apply VRCFT shape keys',items=get_meshes)
+    # Shape Keys
     for i, vrcft_shape in enumerate(VRCFT_Labels):
         setattr(Scene, "vrcft_shapekeys_" + str(i), EnumProperty(name='',description='Select shapekey to use for VRCFT',items=get_shapekeys_vrcft))
-        
-
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls) 
         
-    # Shape keys
-    del Scene.vrcft_mesh
-#    for i in enumerate(VRCFT_Labels):  
-          
+    del Scene.vrcft_mesh          
     del Scene.vrcft_shapekeys_0
     del Scene.vrcft_shapekeys_1
     del Scene.vrcft_shapekeys_2
@@ -486,9 +488,12 @@ def unregister():
     del Scene.vrcft_shapekeys_45
     del Scene.vrcft_shapekeys_46
     del Scene.vrcft_shapekeys_47
-#    del Scene.vrcft_shapekeys_48
-#    del Scene.vrcft_shapekeys_49
+    del Scene.vrcft_shapekeys_48
+    del Scene.vrcft_shapekeys_49
+    del Scene.vrcft_shapekeys_50
+    del Scene.vrcft_shapekeys_51
+    del Scene.vrcft_shapekeys_52
+    del Scene.vrcft_shapekeys_53
         
-
 if __name__ == "__main__":
     register()
