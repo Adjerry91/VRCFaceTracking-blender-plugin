@@ -36,7 +36,6 @@ VRCFT_Labels = [
             "Eye_Left_Down",
             "Eye_Left_Up",
             "Eye_Right_Blink",
-            "Eye_Right_Blink",
             "Eye_Right_Right",
             "Eye_Right_Left",
             "Eye_Right_Down",
@@ -496,8 +495,7 @@ def unregister():
     del Scene.vrcft_shapekeys_51
     del Scene.vrcft_shapekeys_52
     del Scene.vrcft_shapekeys_53
-    del Scene.vrcft_shapekeys_54
-    del Scene.vrcft_shapekeys_55    
+    del Scene.vrcft_shapekeys_54   
         
 if __name__ == "__main__":
     register()
