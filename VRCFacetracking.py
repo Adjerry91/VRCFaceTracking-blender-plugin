@@ -1,7 +1,7 @@
 bl_info = {
     "name" : "VRC Facetracking Shapekeys",
     "author" : "Adjerry91",
-    "version" : (1,1,0),
+    "version" : (1,1,1),
     "blender" : (3,0,0),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -43,8 +43,10 @@ VRCFT_Labels = [
             "Eye_Right_Up",
             "Eye_Left_Wide",
             "Eye_Right_Wide",
-            "Eyes_Dilation",
-            "Eyes_Constrict",
+            "Eye_Left_Dilation",
+            "Eye_Left_Constrict",
+            "Eye_Right_Dilation",
+            "Eye_Right_Constrict",
             "Jaw_Right",
             "Jaw_Left",
             "Jaw_Forward",
@@ -494,6 +496,8 @@ def unregister():
     del Scene.vrcft_shapekeys_51
     del Scene.vrcft_shapekeys_52
     del Scene.vrcft_shapekeys_53
+    del Scene.vrcft_shapekeys_54
+    del Scene.vrcft_shapekeys_55    
         
 if __name__ == "__main__":
     register()
