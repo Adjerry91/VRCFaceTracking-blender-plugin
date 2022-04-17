@@ -1,8 +1,8 @@
 bl_info = {
-    "name" : "VRC Facetracking Shapekeys",
+    "name" : "SRanipal Face Tracking Remapping Tool",
     "author" : "Adjerry91",
-    "version" : (1,1,1),
-    "blender" : (3,0,0),
+    "version" : (2,0,0),
+    "blender" : (3,1,2),
     "location" : "View3d > Tool",
     "warning" : "",
     "wiki_url" : "",
@@ -13,7 +13,7 @@ import bpy
 import math
 
 from bpy.types import (Scene, Menu, Operator, Panel, PropertyGroup)
-from bpy.props import (BoolProperty, IntProperty, StringProperty, BoolVectorProperty, EnumProperty, PointerProperty)
+from bpy.props import (BoolProperty, IntProperty, FloatProperty, StringProperty, BoolVectorProperty, EnumProperty, PointerProperty)
 
 blender_version = bool(bpy.app.version >= (2, 80, 0))
 
@@ -27,7 +27,7 @@ else:
 # VRChat Facetracking Shapekey List   
 # -------------------------------------------------------------------
 
-VRCFT_Labels = [
+SRanipal_Labels = [
             "Eye_Left_squeeze",
             "Eye_Right_squeeze",
             "Eye_Left_Blink",
@@ -51,24 +51,29 @@ VRCFT_Labels = [
             "Jaw_Forward",
             "Jaw_Open",
             "Mouth_Ape_Shape",
+            "Mouth_Left",
+            "Mouth_Right",
             "Mouth_Upper_Right",
             "Mouth_Upper_Left",
             "Mouth_Lower_Right",
             "Mouth_Lower_Left",
-            "Mouth_Upper_Overturn",
-            "Mouth_Lower_Overturn",
-            "Mouth_Pout",
             "Mouth_Smile_Right",
             "Mouth_Smile_Left",
             "Mouth_Sad_Right",
             "Mouth_Sad_Left",
+            "Mouth_Pout",
             "Cheek_Puff_Right",
             "Cheek_Puff_Left",
             "Cheek_Suck",
+            "Mouth_Upper_Up",
+            "Mouth_Lower_Down",
             "Mouth_Upper_UpRight",
             "Mouth_Upper_UpLeft",
             "Mouth_Lower_DownRight",
             "Mouth_Lower_DownLeft",
+            "Mouth_O_Shape",
+            "Mouth_Upper_Overturn",
+            "Mouth_Lower_Overturn",
             "Mouth_Upper_Inside",
             "Mouth_Lower_Inside",
             "Mouth_Lower_Overlay",
@@ -85,6 +90,68 @@ VRCFT_Labels = [
             "Tongue_DownLeft_Morph",   
         ]
 
+FT_Visemes = [
+            "FT_SIL",
+            "FT_PP",
+            "FT_FF",
+            "FT_TH",
+            "FT_DD",
+            "FT_KK",
+            "FT_CH",
+            "FT_SS",
+            "FT_NN",
+            "FT_RR",
+            "FT_AA",
+            "FT_EE",
+            "FT_IH",
+            "FT_OH",
+            "FT_OU", 
+        ]
+
+# ------------------------------------------------------------------------
+#    Scene Properties
+# ------------------------------------------------------------------------
+
+class MySettings(PropertyGroup):
+
+#    my_bool : BoolProperty(
+#        name="Enable or Disable",
+#        description="A bool property",
+#        default = False
+#        )
+
+#    my_int = IntProperty(
+#        name = "Int Value",
+#        description="A integer property",
+#        default = 23,
+#        min = 10,
+#        max = 100
+#        )
+
+    viseme_intensity : FloatProperty(
+        name = "",
+        description = "Visemes intensity reduction with face tracking shapekey controls",
+        default = 0.4,
+        min = 0.0,
+        max = 1.0
+        )
+
+#    my_string : StringProperty(
+#        name="User Input",
+#        description=":",
+#        default="",
+#        maxlen=1024,
+#        )
+#        
+#    my_enum : EnumProperty(
+#        name="Dropdown:",
+#        description="Apply Data to attribute.",
+#        items=[ ('OP1', "Option 1", ""),
+#                ('OP2', "Option 2", ""),
+#                ('OP3', "Option 3", ""),
+#               ]
+#        )
+
 # -------------------------------------------------------------------
 # Functions  
 # -------------------------------------------------------------------
@@ -94,7 +161,7 @@ def duplicate_shapekey(string):
     
     #Check shape keys if duplicate
     if active_object.data.shape_keys.key_blocks.find(string) >= 0:
-#        print("Duplicate shape key found!")       
+        #print("Duplicate shape key found!")       
         return True
     else:          
         return False
@@ -285,21 +352,21 @@ def has_shapekeys(mesh):
 # -------------------------------------------------------------------    
 
 class VRCFT_OT_CreateShapeKeys(Operator):
-    """Creates VRChat Facetracking Shapekeys"""
-    bl_label = "Create VRChat Facetracking Shape Keys"
+    """Creates SRanipal Facetracking Shape Keys"""
+    bl_label = "Create SRanipal Facetracking Shape Keys"
     bl_idname = "vrcft.create_shapekeys"
 
     def execute(self, context):
 
         object = bpy.context.object        
         scene = context.scene       
-        vrcft_mesh = scene.vrcft_mesh
+        ft_mesh = scene.ft_mesh
         active_object = bpy.context.active_object
         mesh = bpy.ops.mesh
         ops = bpy.ops
 
         #Set the selected mesh to active object
-        mesh = get_objects()[vrcft_mesh]
+        mesh = get_objects()[ft_mesh]
         self.report({'INFO'}, "Selected mesh is: " + str(vrcft_mesh))
         set_active(mesh)
 
@@ -308,46 +375,115 @@ class VRCFT_OT_CreateShapeKeys(Operator):
         if object.data.shape_keys: 
             
             #Create beginning seperation marker for VRCFT Shape Keys
-            if duplicate_shapekey("~~ VRCFacetracking ~~") == False :    
-                object.shape_key_add(name="~~ VRCFacetracking ~~", from_mix=False)
+            if duplicate_shapekey("~~ SRanipal Face Tracking ~~") == False :    
+                object.shape_key_add(name="~~ SRanipal Face Tracking ~~", from_mix=False)
                     
             #Clear all existing values for shape keys
             ops.object.shape_key_clear()
 
-            for x in range(len(VRCFT_Labels)):
-                curr_key = eval("scene.vrcft_shapekeys_" + str(x))
+            for x in range(len(SRanipal_Labels)):
+                curr_key = eval("scene.ft_shapekey_" + str(x))
                 
                 #Check if blend with 'Basis' shape key
                 if curr_key == "Basis":
                     #Check for duplicates
-                    if duplicate_shapekey(VRCFT_Labels[x]) == False :
-                        object.shape_key_add(name=VRCFT_Labels[x], from_mix=False)
+                    if duplicate_shapekey(SRanipal_Labels[x]) == False :
+                        object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
                     #Do not overwrite if the shape key exists and is on 'Basis'
                         
                 else:                                     
                     #Check for duplicates
-                    if duplicate_shapekey(VRCFT_Labels[x]) == False :
+                    if duplicate_shapekey(SRanipal_Labels[x]) == False :
                         # Find shapekey enterred and mix to create new shapekey
                         object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
                         object.data.shape_keys.key_blocks[curr_key].value = 1                      
-                        object.shape_key_add(name=VRCFT_Labels[x], from_mix=True)                        
+                        object.shape_key_add(name=SRanipal_Labels[x], from_mix=True)                        
                     else:
                         #Mix to existing shape key duplicate
-                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(VRCFT_Labels[x])
+                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(SRanipal_Labels[x])
                         object.data.shape_keys.key_blocks[curr_key].value = 1
                         ops.object.mode_set(mode='EDIT', toggle=False)
                         bpy.ops.mesh.select_mode(type="VERT")
                         ops.mesh.select_all(action='SELECT')
                         ops.mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
-                        self.report({'INFO'}, "Existing VRC facetracking shape key: " + VRCFT_Labels[x] + " has been overwritten with: " + curr_key)
+                        self.report({'INFO'}, "Existing SRanipal face tracking shape key: " + SRanipal_Labels[x] + " has been overwritten with: " + curr_key)
                     #Clear shape key weights    
                     ops.object.shape_key_clear()
-                        
+                                    
+            self.report({'INFO'}, "SRanipal face tracking shapekeys have been created on mesh")
+            
+                
+            #Cleanup mode state
+            ops.object.mode_set(mode='OBJECT', toggle=False)
+            
+            #Move active shape to 'Basis'
+            active_object.active_shape_key_index = 0
+                
+        else:
+            #Error message if basis does not exist
+            self.report({'WARNING'}, "No shape keys found on mesh")
+        return{'FINISHED'}
 
-            #Create end seperation marker for VRCFT Shape Keys
-            if duplicate_shapekey("~~ END OF VRCFacetracking ~~") == False : 
-                object.shape_key_add(name="~~ END OF VRCFacetracking ~~",from_mix=False)                
-            self.report({'INFO'}, "VRC facetracking shapekeys have been created on mesh")
+class VRCFT_OT_CreateVisemes(Operator):
+    """Creates VRChat Face Tracking Visemes"""
+    bl_label = "Create VRChat Face Tracking Visemes"
+    bl_idname = "vrcft.create_visemes"
+
+    def execute(self, context):
+
+        object = bpy.context.object        
+        scene = context.scene       
+        ft_mesh = scene.ft_mesh
+        active_object = bpy.context.active_object
+        mesh = bpy.ops.mesh
+        ops = bpy.ops
+
+        #Set the selected mesh to active object
+        mesh = get_objects()[ft_mesh]
+        self.report({'INFO'}, "Selected mesh is: " + str(vrcft_mesh))
+        set_active(mesh)
+
+
+        #Check if there is shape keys on the mesh
+        if object.data.shape_keys: 
+            
+            #Create beginning seperation marker for VRCFT Shape Keys
+            if duplicate_shapekey("~~ Face Tracking Visemes ~~") == False :    
+                object.shape_key_add(name="~~ Face Tracking Visemes ~~", from_mix=False)
+                    
+            #Clear all existing values for shape keys
+            ops.object.shape_key_clear()
+
+            for x in range(len(FT_Visemes)):
+                curr_key = eval("scene.vrcft_viseme_" + str(x))
+                
+                #Check if blend with 'Basis' shape key
+                if curr_key == "Basis":
+                    #Check for duplicates
+                    if duplicate_shapekey(FT_Visemes[x]) == False :
+                        object.shape_key_add(name=FT_Visemes[x], from_mix=False)
+                    #Do not overwrite if the shape key exists and is on 'Basis'
+                        
+                else:                                     
+                    #Check for duplicates
+                    if duplicate_shapekey(FT_Visemes[x]) == False :
+                        # Find shapekey enterred and mix to create new shapekey
+                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
+                        object.data.shape_keys.key_blocks[curr_key].value = 0.4                      
+                        object.shape_key_add(name=FT_Visemes[x], from_mix=True)                        
+                    else:
+                        #Mix to existing shape key duplicate
+                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(VRCFT_Visemes[x])
+                        object.data.shape_keys.key_blocks[curr_key].value = 0.4
+                        ops.object.mode_set(mode='EDIT', toggle=False)
+                        bpy.ops.mesh.select_mode(type="VERT")
+                        ops.mesh.select_all(action='SELECT')
+                        ops.mesh.blend_from_shape(shape=curr_key, blend=1, add=False)
+                        self.report({'INFO'}, "Existing SRanipal Viseme shape key: " + VRCFT_Visemes[x] + " has been overwritten with: " + curr_key)
+                    #Clear shape key weights    
+                    ops.object.shape_key_clear()
+                                     
+            self.report({'INFO'}, "SRanipal facetracking shapekeys have been created on mesh")
             
                 
             #Cleanup mode state
@@ -365,9 +501,9 @@ class VRCFT_OT_CreateShapeKeys(Operator):
 # User Interface  
 # -------------------------------------------------------------------
 
-class VRCFT_UL(Panel):
-    bl_label = "VRChat Facetracking"
-    bl_idname = "VRCFT"
+class VRCFT_Shapes_UL(Panel):
+    bl_label = "SRanipal Shape Key Mapping"
+    bl_idname = "FT Shapes"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "VRCFT"
@@ -375,14 +511,14 @@ class VRCFT_UL(Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        vrcft_mesh = scene.vrcft_mesh
+        ft_mesh = scene.ft_mesh
         object = bpy.context.object
         
         #Start Layout
         col = layout.column()
         
         #Mesh Selection
-        mesh = get_objects()[vrcft_mesh]
+        mesh = get_objects()[ft_mesh]
         mesh_count = len(get_meshes_objects(check=False, mode=2))     
         row = col.row(align=True)
         row.scale_y = 1.1
@@ -391,12 +527,12 @@ class VRCFT_UL(Panel):
         row = col.row(align=True)
         
         #Check mesh selections        
-        if vrcft_mesh and has_shapekeys(mesh):
+        if ft_mesh and has_shapekeys(mesh):
             #Info
             
             row = col.row(align=True)
             row.scale_y = 1.1
-            row.label(text='Select shape keys to create VRCFT shape keys.', icon='INFO')
+            row.label(text='Select shape keys to create SRanipal Shape Keys.', icon='INFO')
             col.separator()
             
             #Start Box
@@ -404,11 +540,11 @@ class VRCFT_UL(Panel):
             col = box.column(align=True)
 
             #Start List of Shapekeys from VRCFT labels list
-            for i in range(len(VRCFT_Labels)):
+            for i in range(len(SRanipal_Labels)):
                 row = col.row(align=True)
                 row.scale_y = 1.1
-                row.label(text = VRCFT_Labels[i] + ":")
-                row.prop(scene, 'vrcft_shapekeys_' + str(i), icon='SHAPEKEY_DATA')                 
+                row.label(text = SRanipal_Labels[i] + ":")
+                row.prop(scene, 'ft_shapekey_' + str(i), icon='SHAPEKEY_DATA')                 
             row = layout.row()
             row.operator("vrcft.create_shapekeys", icon='MESH_MONKEY')
         else:
@@ -416,86 +552,182 @@ class VRCFT_UL(Panel):
             row.scale_y = 1.1
             row.label(text='Select the mesh with face shape keys.', icon='INFO')
             col.separator()
+
+class VRCFT_Visemes_UL(Panel):
+    bl_label = "FT Visemes Remapping"
+    bl_idname = "FT Visemes"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "VRCFT"
+    
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        ft_mesh = scene.ft_mesh
+        object = bpy.context.object
+        mytool = scene.my_tool
+        
+        #Start Layout
+        col = layout.column()
+        
+        #Mesh Selection
+        mesh = get_objects()[ft_mesh]
+        mesh_count = len(get_meshes_objects(check=False, mode=2))     
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(context.scene, 'vrcft_mesh', icon='MESH_DATA')
+        col.separator()                       
+        row = col.row(align=True)
+        
+        #Check mesh selections        
+        if ft_mesh and has_shapekeys(mesh):
+            
+            #Info
+            row = col.row(align=True)
+            row.scale_y = 1.1
+            row.label(text='Select shape keys to create VRCFT visemes.', icon='INFO')
+            col.separator()
+            
+            # Viseme Intensity
+            row = col.row(align=True)
+            row.label(text='Face Tracking Viseme Intensity')
+            row.prop(mytool, "viseme_intensity")
+            
+            #Start Box
+            box = layout.box()
+            col = box.column(align=True)
+            
+            #Start List of Shapekeys from VRCFT labels list
+            for i in range(len(FT_Visemes)):
+                row = col.row(align=True)
+                row.scale_y = 1.1
+                row.label(text = FT_Visemes[i] + ":")
+                row.prop(scene, 'ft_viseme_' + str(i), icon='SHAPEKEY_DATA')                 
+            row = layout.row()   
+            row.operator("vrcft.create_visemes", icon='MESH_MONKEY')           
+        else:
+            row = col.row(align=True)
+            row.scale_y = 1.1
+            row.label(text='Select the mesh with face shape keys.', icon='INFO')
+            col.separator()
+                    
         
 # -------------------------------------------------------------------
 # Register
 # -------------------------------------------------------------------
 
 classes = (
+    MySettings,
     VRCFT_OT_CreateShapeKeys,
-    VRCFT_UL
+    VRCFT_OT_CreateVisemes,
+    VRCFT_Shapes_UL,
+    VRCFT_Visemes_UL
 )
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-      
+    
+    # My Settings Tools
+    Scene.my_tool = PointerProperty(type=MySettings)  
     # Mesh Select
-    Scene.vrcft_mesh = EnumProperty(name='Mesh',description='Mesh to apply VRCFT shape keys',items=get_meshes)
+    Scene.ft_mesh = EnumProperty(name='Mesh',description='Mesh to apply VRCFT shape keys',items=get_meshes)
     # Shape Keys
-    for i, vrcft_shape in enumerate(VRCFT_Labels):
-        setattr(Scene, "vrcft_shapekeys_" + str(i), EnumProperty(name='',description='Select shapekey to use for VRCFT',items=get_shapekeys_vrcft))
+    for i, vrcft_shape in enumerate(SRanipal_Labels):
+        setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(name='',description='Select shapekey to use for VRCFT',items=get_shapekeys_vrcft))
+    # Visemes
+    for i, ft_viseme in enumerate(FT_Visemes):
+        setattr(Scene, "ft_viseme_" + str(i), EnumProperty(name='',description='Select existing viseme',items=get_shapekeys_vrcft))
+
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls) 
+    
+    del Scene.my_tool
+    
+    for i, vrcft_shape in enumerate(SRanipal_Labels):
+        delattr(Scene, "ft_shapekey_" + str(i))
         
-    del Scene.vrcft_mesh          
-    del Scene.vrcft_shapekeys_0
-    del Scene.vrcft_shapekeys_1
-    del Scene.vrcft_shapekeys_2
-    del Scene.vrcft_shapekeys_3
-    del Scene.vrcft_shapekeys_4
-    del Scene.vrcft_shapekeys_5
-    del Scene.vrcft_shapekeys_6
-    del Scene.vrcft_shapekeys_7
-    del Scene.vrcft_shapekeys_8
-    del Scene.vrcft_shapekeys_9
-    del Scene.vrcft_shapekeys_10
-    del Scene.vrcft_shapekeys_11
-    del Scene.vrcft_shapekeys_12
-    del Scene.vrcft_shapekeys_13
-    del Scene.vrcft_shapekeys_14
-    del Scene.vrcft_shapekeys_15
-    del Scene.vrcft_shapekeys_16
-    del Scene.vrcft_shapekeys_17
-    del Scene.vrcft_shapekeys_18
-    del Scene.vrcft_shapekeys_19
-    del Scene.vrcft_shapekeys_20
-    del Scene.vrcft_shapekeys_21
-    del Scene.vrcft_shapekeys_22
-    del Scene.vrcft_shapekeys_23
-    del Scene.vrcft_shapekeys_24
-    del Scene.vrcft_shapekeys_25
-    del Scene.vrcft_shapekeys_26
-    del Scene.vrcft_shapekeys_27
-    del Scene.vrcft_shapekeys_28
-    del Scene.vrcft_shapekeys_29
-    del Scene.vrcft_shapekeys_30
-    del Scene.vrcft_shapekeys_31
-    del Scene.vrcft_shapekeys_32
-    del Scene.vrcft_shapekeys_33
-    del Scene.vrcft_shapekeys_34
-    del Scene.vrcft_shapekeys_35
-    del Scene.vrcft_shapekeys_36
-    del Scene.vrcft_shapekeys_37
-    del Scene.vrcft_shapekeys_38
-    del Scene.vrcft_shapekeys_39
-    del Scene.vrcft_shapekeys_40
-    del Scene.vrcft_shapekeys_41
-    del Scene.vrcft_shapekeys_42
-    del Scene.vrcft_shapekeys_43
-    del Scene.vrcft_shapekeys_44
-    del Scene.vrcft_shapekeys_45
-    del Scene.vrcft_shapekeys_46
-    del Scene.vrcft_shapekeys_47
-    del Scene.vrcft_shapekeys_48
-    del Scene.vrcft_shapekeys_49
-    del Scene.vrcft_shapekeys_50
-    del Scene.vrcft_shapekeys_51
-    del Scene.vrcft_shapekeys_52
-    del Scene.vrcft_shapekeys_53
-    del Scene.vrcft_shapekeys_54   
+#    del Scene.vrcft_mesh          
+#    del Scene.vrcft_shapekeys_0
+#    del Scene.vrcft_shapekeys_1
+#    del Scene.vrcft_shapekeys_2
+#    del Scene.vrcft_shapekeys_3
+#    del Scene.vrcft_shapekeys_4
+#    del Scene.vrcft_shapekeys_5
+#    del Scene.vrcft_shapekeys_6
+#    del Scene.vrcft_shapekeys_7
+#    del Scene.vrcft_shapekeys_8
+#    del Scene.vrcft_shapekeys_9
+#    del Scene.vrcft_shapekeys_10
+#    del Scene.vrcft_shapekeys_11
+#    del Scene.vrcft_shapekeys_12
+#    del Scene.vrcft_shapekeys_13
+#    del Scene.vrcft_shapekeys_14
+#    del Scene.vrcft_shapekeys_15
+#    del Scene.vrcft_shapekeys_16
+#    del Scene.vrcft_shapekeys_17
+#    del Scene.vrcft_shapekeys_18
+#    del Scene.vrcft_shapekeys_19
+#    del Scene.vrcft_shapekeys_20
+#    del Scene.vrcft_shapekeys_21
+#    del Scene.vrcft_shapekeys_22
+#    del Scene.vrcft_shapekeys_23
+#    del Scene.vrcft_shapekeys_24
+#    del Scene.vrcft_shapekeys_25
+#    del Scene.vrcft_shapekeys_26
+#    del Scene.vrcft_shapekeys_27
+#    del Scene.vrcft_shapekeys_28
+#    del Scene.vrcft_shapekeys_29
+#    del Scene.vrcft_shapekeys_30
+#    del Scene.vrcft_shapekeys_31
+#    del Scene.vrcft_shapekeys_32
+#    del Scene.vrcft_shapekeys_33
+#    del Scene.vrcft_shapekeys_34
+#    del Scene.vrcft_shapekeys_35
+#    del Scene.vrcft_shapekeys_36
+#    del Scene.vrcft_shapekeys_37
+#    del Scene.vrcft_shapekeys_38
+#    del Scene.vrcft_shapekeys_39
+#    del Scene.vrcft_shapekeys_40
+#    del Scene.vrcft_shapekeys_41
+#    del Scene.vrcft_shapekeys_42
+#    del Scene.vrcft_shapekeys_43
+#    del Scene.vrcft_shapekeys_44
+#    del Scene.vrcft_shapekeys_45
+#    del Scene.vrcft_shapekeys_46
+#    del Scene.vrcft_shapekeys_47
+#    del Scene.vrcft_shapekeys_48
+#    del Scene.vrcft_shapekeys_49
+#    del Scene.vrcft_shapekeys_50
+#    del Scene.vrcft_shapekeys_51
+#    del Scene.vrcft_shapekeys_52
+#    del Scene.vrcft_shapekeys_53
+#    del Scene.vrcft_shapekeys_54
+#    del Scene.vrcft_shapekeys_55
+#    del Scene.vrcft_shapekeys_56
+#    del Scene.vrcft_shapekeys_57
+#    del Scene.vrcft_shapekeys_58 
+
+    for i, ft_viseme in enumerate(FT_Visemes):
+        delattr(Scene, "ft_viseme_" + str(i))
+    
+#    del Scene.vrcft_viseme_0
+#    del Scene.vrcft_viseme_1
+#    del Scene.vrcft_viseme_2
+#    del Scene.vrcft_viseme_3
+#    del Scene.vrcft_viseme_4
+#    del Scene.vrcft_viseme_5
+#    del Scene.vrcft_viseme_6
+#    del Scene.vrcft_viseme_7
+#    del Scene.vrcft_viseme_8
+#    del Scene.vrcft_viseme_9
+#    del Scene.vrcft_viseme_10
+#    del Scene.vrcft_viseme_11
+#    del Scene.vrcft_viseme_12
+#    del Scene.vrcft_viseme_13
+#    del Scene.vrcft_viseme_14  
         
 if __name__ == "__main__":
     register()
