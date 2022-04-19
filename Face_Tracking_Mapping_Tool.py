@@ -1,5 +1,5 @@
 bl_info = {
-    "name" : "SRanipal Face Tracking Remapping Tool",
+    "name" : "Face Tracking Mapping Tool",
     "author" : "Adjerry91",
     "version" : (2,0,0),
     "blender" : (3,1,2),
@@ -270,7 +270,7 @@ def get_meshes_objects(armature_name=None, mode=2, check=True, visible_only=Fals
 
     return meshes
 
-def get_shapekeys_vrcft(self, context):
+def get_shapekeys_ft(self, context):
     return get_shapekeys(context, [], False, False, False)
 
 def get_shapekeys(context, names, no_basis, decimation, return_list):
@@ -281,7 +281,7 @@ def get_shapekeys(context, names, no_basis, decimation, return_list):
     if decimation:
         meshes = meshes_list
     elif meshes_list:
-        meshes = [get_objects().get(context.scene.vrcft_mesh)]  
+        meshes = [get_objects().get(context.scene.ft_mesh)]  
     else:
         bpy.types.Object.Enum = choices
         return bpy.types.Object.Enum
@@ -351,10 +351,10 @@ def has_shapekeys(mesh):
 # Shape Key Operators    
 # -------------------------------------------------------------------    
 
-class VRCFT_OT_CreateShapeKeys(Operator):
+class FT_OT_CreateShapeKeys(Operator):
     """Creates SRanipal Facetracking Shape Keys"""
-    bl_label = "Create SRanipal Facetracking Shape Keys"
-    bl_idname = "vrcft.create_shapekeys"
+    bl_label = "Create SRanipal Face Tracking Shape Keys"
+    bl_idname = "ft.create_shapekeys"
 
     def execute(self, context):
 
@@ -367,7 +367,7 @@ class VRCFT_OT_CreateShapeKeys(Operator):
 
         #Set the selected mesh to active object
         mesh = get_objects()[ft_mesh]
-        self.report({'INFO'}, "Selected mesh is: " + str(vrcft_mesh))
+        self.report({'INFO'}, "Selected mesh is: " + str(ft_mesh))
         set_active(mesh)
 
 
@@ -424,10 +424,10 @@ class VRCFT_OT_CreateShapeKeys(Operator):
             self.report({'WARNING'}, "No shape keys found on mesh")
         return{'FINISHED'}
 
-class VRCFT_OT_CreateVisemes(Operator):
-    """Creates VRChat Face Tracking Visemes"""
-    bl_label = "Create VRChat Face Tracking Visemes"
-    bl_idname = "vrcft.create_visemes"
+class FT_OT_CreateVisemes(Operator):
+    """Creates Face Tracking Visemes"""
+    bl_label = "Create Face Tracking Visemes (Reduced Visemes)"
+    bl_idname = "ft.create_visemes"
 
     def execute(self, context):
 
@@ -440,7 +440,7 @@ class VRCFT_OT_CreateVisemes(Operator):
 
         #Set the selected mesh to active object
         mesh = get_objects()[ft_mesh]
-        self.report({'INFO'}, "Selected mesh is: " + str(vrcft_mesh))
+        self.report({'INFO'}, "Selected mesh is: " + str(ft_mesh))
         set_active(mesh)
 
 
@@ -455,7 +455,7 @@ class VRCFT_OT_CreateVisemes(Operator):
             ops.object.shape_key_clear()
 
             for x in range(len(FT_Visemes)):
-                curr_key = eval("scene.vrcft_viseme_" + str(x))
+                curr_key = eval("scene.ft_viseme_" + str(x))
                 
                 #Check if blend with 'Basis' shape key
                 if curr_key == "Basis":
@@ -473,13 +473,13 @@ class VRCFT_OT_CreateVisemes(Operator):
                         object.shape_key_add(name=FT_Visemes[x], from_mix=True)                        
                     else:
                         #Mix to existing shape key duplicate
-                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(VRCFT_Visemes[x])
+                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(FT_Visemes[x])
                         object.data.shape_keys.key_blocks[curr_key].value = 0.4
                         ops.object.mode_set(mode='EDIT', toggle=False)
                         bpy.ops.mesh.select_mode(type="VERT")
                         ops.mesh.select_all(action='SELECT')
                         ops.mesh.blend_from_shape(shape=curr_key, blend=1, add=False)
-                        self.report({'INFO'}, "Existing SRanipal Viseme shape key: " + VRCFT_Visemes[x] + " has been overwritten with: " + curr_key)
+                        self.report({'INFO'}, "Existing SRanipal Viseme shape key: " + FT_Visemes[x] + " has been overwritten with: " + curr_key)
                     #Clear shape key weights    
                     ops.object.shape_key_clear()
                                      
@@ -501,12 +501,12 @@ class VRCFT_OT_CreateVisemes(Operator):
 # User Interface  
 # -------------------------------------------------------------------
 
-class VRCFT_Shapes_UL(Panel):
+class FT_Shapes_UL(Panel):
     bl_label = "SRanipal Shape Key Mapping"
     bl_idname = "FT Shapes"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "VRCFT"
+    bl_category = "FT MAPPING"
 
     def draw(self, context):
         layout = self.layout
@@ -522,7 +522,7 @@ class VRCFT_Shapes_UL(Panel):
         mesh_count = len(get_meshes_objects(check=False, mode=2))     
         row = col.row(align=True)
         row.scale_y = 1.1
-        row.prop(context.scene, 'vrcft_mesh', icon='MESH_DATA')
+        row.prop(context.scene, 'ft_mesh', icon='MESH_DATA')
         col.separator()                       
         row = col.row(align=True)
         
@@ -553,12 +553,12 @@ class VRCFT_Shapes_UL(Panel):
             row.label(text='Select the mesh with face shape keys.', icon='INFO')
             col.separator()
 
-class VRCFT_Visemes_UL(Panel):
-    bl_label = "FT Visemes Remapping"
+class FT_Visemes_UL(Panel):
+    bl_label = "FT Visemes Mapping"
     bl_idname = "FT Visemes"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "VRCFT"
+    bl_category = "FT MAPPING"
     
     def draw(self, context):
         layout = self.layout
@@ -575,7 +575,7 @@ class VRCFT_Visemes_UL(Panel):
         mesh_count = len(get_meshes_objects(check=False, mode=2))     
         row = col.row(align=True)
         row.scale_y = 1.1
-        row.prop(context.scene, 'vrcft_mesh', icon='MESH_DATA')
+        row.prop(context.scene, 'ft_mesh', icon='MESH_DATA')
         col.separator()                       
         row = col.row(align=True)
         
@@ -585,7 +585,7 @@ class VRCFT_Visemes_UL(Panel):
             #Info
             row = col.row(align=True)
             row.scale_y = 1.1
-            row.label(text='Select shape keys to create VRCFT visemes.', icon='INFO')
+            row.label(text='Select shape keys to create visemes.', icon='INFO')
             col.separator()
             
             # Viseme Intensity
@@ -604,7 +604,7 @@ class VRCFT_Visemes_UL(Panel):
                 row.label(text = FT_Visemes[i] + ":")
                 row.prop(scene, 'ft_viseme_' + str(i), icon='SHAPEKEY_DATA')                 
             row = layout.row()   
-            row.operator("vrcft.create_visemes", icon='MESH_MONKEY')           
+            row.operator("ft.create_visemes", icon='MESH_MONKEY')           
         else:
             row = col.row(align=True)
             row.scale_y = 1.1
@@ -618,10 +618,10 @@ class VRCFT_Visemes_UL(Panel):
 
 classes = (
     MySettings,
-    VRCFT_OT_CreateShapeKeys,
-    VRCFT_OT_CreateVisemes,
-    VRCFT_Shapes_UL,
-    VRCFT_Visemes_UL
+    FT_OT_CreateShapeKeys,
+    FT_OT_CreateVisemes,
+    FT_Shapes_UL,
+    FT_Visemes_UL
 )
 
 def register():
@@ -631,13 +631,13 @@ def register():
     # My Settings Tools
     Scene.my_tool = PointerProperty(type=MySettings)  
     # Mesh Select
-    Scene.ft_mesh = EnumProperty(name='Mesh',description='Mesh to apply VRCFT shape keys',items=get_meshes)
+    Scene.ft_mesh = EnumProperty(name='Mesh',description='Mesh to apply FT shape keys',items=get_meshes)
     # Shape Keys
-    for i, vrcft_shape in enumerate(SRanipal_Labels):
-        setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(name='',description='Select shapekey to use for VRCFT',items=get_shapekeys_vrcft))
+    for i, ft_shape in enumerate(SRanipal_Labels):
+        setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(name='',description='Select shapekey to use for VRCFT',items=get_shapekeys_ft))
     # Visemes
     for i, ft_viseme in enumerate(FT_Visemes):
-        setattr(Scene, "ft_viseme_" + str(i), EnumProperty(name='',description='Select existing viseme',items=get_shapekeys_vrcft))
+        setattr(Scene, "ft_viseme_" + str(i), EnumProperty(name='',description='Select existing viseme',items=get_shapekeys_ft))
 
 
 def unregister():
@@ -646,7 +646,7 @@ def unregister():
     
     del Scene.my_tool
     
-    for i, vrcft_shape in enumerate(SRanipal_Labels):
+    for i, ft_shape in enumerate(SRanipal_Labels):
         delattr(Scene, "ft_shapekey_" + str(i))
         
 #    del Scene.vrcft_mesh          
