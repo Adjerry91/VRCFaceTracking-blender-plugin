@@ -24,7 +24,7 @@ else:
     user_preferences = bpy.context.user_preferences
 
 # -------------------------------------------------------------------
-# VRChat Facetracking Shapekey List   
+# SRanipal Facetracking Shapekey List   
 # -------------------------------------------------------------------
 
 SRanipal_Labels = [
@@ -107,50 +107,6 @@ FT_Visemes = [
             "FT_OH",
             "FT_OU", 
         ]
-
-# ------------------------------------------------------------------------
-#    Scene Properties
-# ------------------------------------------------------------------------
-
-class MySettings(PropertyGroup):
-
-#    my_bool : BoolProperty(
-#        name="Enable or Disable",
-#        description="A bool property",
-#        default = False
-#        )
-
-#    my_int = IntProperty(
-#        name = "Int Value",
-#        description="A integer property",
-#        default = 23,
-#        min = 10,
-#        max = 100
-#        )
-
-    viseme_intensity : FloatProperty(
-        name = "",
-        description = "Visemes intensity reduction with face tracking shapekey controls",
-        default = 0.4,
-        min = 0.0,
-        max = 1.0
-        )
-
-#    my_string : StringProperty(
-#        name="User Input",
-#        description=":",
-#        default="",
-#        maxlen=1024,
-#        )
-#        
-#    my_enum : EnumProperty(
-#        name="Dropdown:",
-#        description="Apply Data to attribute.",
-#        items=[ ('OP1', "Option 1", ""),
-#                ('OP2', "Option 2", ""),
-#                ('OP3', "Option 3", ""),
-#               ]
-#        )
 
 # -------------------------------------------------------------------
 # Functions  
@@ -447,7 +403,7 @@ class FT_OT_CreateVisemes(Operator):
         #Check if there is shape keys on the mesh
         if object.data.shape_keys: 
             
-            #Create beginning seperation marker for VRCFT Shape Keys
+            #Create beginning seperation marker for Viseme Shape Keys
             if duplicate_shapekey("~~ Face Tracking Visemes ~~") == False :    
                 object.shape_key_add(name="~~ Face Tracking Visemes ~~", from_mix=False)
                     
@@ -469,12 +425,12 @@ class FT_OT_CreateVisemes(Operator):
                     if duplicate_shapekey(FT_Visemes[x]) == False :
                         # Find shapekey enterred and mix to create new shapekey
                         object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
-                        object.data.shape_keys.key_blocks[curr_key].value = 0.4                      
+                        object.data.shape_keys.key_blocks[curr_key].value = eval('scene.ft_viseme_int_' + str(x))                     
                         object.shape_key_add(name=FT_Visemes[x], from_mix=True)                        
                     else:
                         #Mix to existing shape key duplicate
                         object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(FT_Visemes[x])
-                        object.data.shape_keys.key_blocks[curr_key].value = 0.4
+                        object.data.shape_keys.key_blocks[curr_key].value = eval('scene.ft_viseme_int_' + str(x))
                         ops.object.mode_set(mode='EDIT', toggle=False)
                         bpy.ops.mesh.select_mode(type="VERT")
                         ops.mesh.select_all(action='SELECT')
@@ -483,7 +439,7 @@ class FT_OT_CreateVisemes(Operator):
                     #Clear shape key weights    
                     ops.object.shape_key_clear()
                                      
-            self.report({'INFO'}, "SRanipal facetracking shapekeys have been created on mesh")
+            self.report({'INFO'}, "SRanipal face tracking shapekeys have been created on mesh")
             
                 
             #Cleanup mode state
@@ -546,7 +502,7 @@ class FT_Shapes_UL(Panel):
                 row.label(text = SRanipal_Labels[i] + ":")
                 row.prop(scene, 'ft_shapekey_' + str(i), icon='SHAPEKEY_DATA')                 
             row = layout.row()
-            row.operator("vrcft.create_shapekeys", icon='MESH_MONKEY')
+            row.operator("ft.create_shapekeys", icon='MESH_MONKEY')
         else:
             row = col.row(align=True)
             row.scale_y = 1.1
@@ -554,8 +510,8 @@ class FT_Shapes_UL(Panel):
             col.separator()
 
 class FT_Visemes_UL(Panel):
-    bl_label = "FT Visemes Mapping"
-    bl_idname = "FT Visemes"
+    bl_label = "FT Viseme Mapping"
+    bl_idname = "FT Viseme"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "FT MAPPING"
@@ -565,7 +521,6 @@ class FT_Visemes_UL(Panel):
         scene = context.scene
         ft_mesh = scene.ft_mesh
         object = bpy.context.object
-        mytool = scene.my_tool
         
         #Start Layout
         col = layout.column()
@@ -588,11 +543,6 @@ class FT_Visemes_UL(Panel):
             row.label(text='Select shape keys to create visemes.', icon='INFO')
             col.separator()
             
-            # Viseme Intensity
-            row = col.row(align=True)
-            row.label(text='Face Tracking Viseme Intensity')
-            row.prop(mytool, "viseme_intensity")
-            
             #Start Box
             box = layout.box()
             col = box.column(align=True)
@@ -602,7 +552,8 @@ class FT_Visemes_UL(Panel):
                 row = col.row(align=True)
                 row.scale_y = 1.1
                 row.label(text = FT_Visemes[i] + ":")
-                row.prop(scene, 'ft_viseme_' + str(i), icon='SHAPEKEY_DATA')                 
+                row.prop(scene, 'ft_viseme_' + str(i), icon='SHAPEKEY_DATA')
+                row.prop(scene, 'ft_viseme_int_' + str(i))                 
             row = layout.row()   
             row.operator("ft.create_visemes", icon='MESH_MONKEY')           
         else:
@@ -617,7 +568,6 @@ class FT_Visemes_UL(Panel):
 # -------------------------------------------------------------------
 
 classes = (
-    MySettings,
     FT_OT_CreateShapeKeys,
     FT_OT_CreateVisemes,
     FT_Shapes_UL,
@@ -627,107 +577,46 @@ classes = (
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    
-    # My Settings Tools
-    Scene.my_tool = PointerProperty(type=MySettings)  
+     
     # Mesh Select
     Scene.ft_mesh = EnumProperty(name='Mesh',description='Mesh to apply FT shape keys',items=get_meshes)
     # Shape Keys
     for i, ft_shape in enumerate(SRanipal_Labels):
-        setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(name='',description='Select shapekey to use for VRCFT',items=get_shapekeys_ft))
+        setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(
+            name='',
+            description='Select shapekey to use for VRCFT',
+            items=get_shapekeys_ft)
+        )
     # Visemes
     for i, ft_viseme in enumerate(FT_Visemes):
-        setattr(Scene, "ft_viseme_" + str(i), EnumProperty(name='',description='Select existing viseme',items=get_shapekeys_ft))
-
+        setattr(Scene, "ft_viseme_" + str(i), EnumProperty(
+            name='',
+            description='Select existing viseme',
+            items=get_shapekeys_ft)
+        )
+    # Viseme Intensity
+    for i, ft_viseme in enumerate(FT_Visemes):
+        setattr(Scene, "ft_viseme_int_" + str(i), FloatProperty(
+            name = "",
+            description = "Visemes intensity reduction with face tracking shapekey controls",
+            default = 0.5,
+            min = 0.0,
+            max = 1.0
+            )
+        )
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls) 
     
-    del Scene.my_tool
-    
     for i, ft_shape in enumerate(SRanipal_Labels):
         delattr(Scene, "ft_shapekey_" + str(i))
         
-#    del Scene.vrcft_mesh          
-#    del Scene.vrcft_shapekeys_0
-#    del Scene.vrcft_shapekeys_1
-#    del Scene.vrcft_shapekeys_2
-#    del Scene.vrcft_shapekeys_3
-#    del Scene.vrcft_shapekeys_4
-#    del Scene.vrcft_shapekeys_5
-#    del Scene.vrcft_shapekeys_6
-#    del Scene.vrcft_shapekeys_7
-#    del Scene.vrcft_shapekeys_8
-#    del Scene.vrcft_shapekeys_9
-#    del Scene.vrcft_shapekeys_10
-#    del Scene.vrcft_shapekeys_11
-#    del Scene.vrcft_shapekeys_12
-#    del Scene.vrcft_shapekeys_13
-#    del Scene.vrcft_shapekeys_14
-#    del Scene.vrcft_shapekeys_15
-#    del Scene.vrcft_shapekeys_16
-#    del Scene.vrcft_shapekeys_17
-#    del Scene.vrcft_shapekeys_18
-#    del Scene.vrcft_shapekeys_19
-#    del Scene.vrcft_shapekeys_20
-#    del Scene.vrcft_shapekeys_21
-#    del Scene.vrcft_shapekeys_22
-#    del Scene.vrcft_shapekeys_23
-#    del Scene.vrcft_shapekeys_24
-#    del Scene.vrcft_shapekeys_25
-#    del Scene.vrcft_shapekeys_26
-#    del Scene.vrcft_shapekeys_27
-#    del Scene.vrcft_shapekeys_28
-#    del Scene.vrcft_shapekeys_29
-#    del Scene.vrcft_shapekeys_30
-#    del Scene.vrcft_shapekeys_31
-#    del Scene.vrcft_shapekeys_32
-#    del Scene.vrcft_shapekeys_33
-#    del Scene.vrcft_shapekeys_34
-#    del Scene.vrcft_shapekeys_35
-#    del Scene.vrcft_shapekeys_36
-#    del Scene.vrcft_shapekeys_37
-#    del Scene.vrcft_shapekeys_38
-#    del Scene.vrcft_shapekeys_39
-#    del Scene.vrcft_shapekeys_40
-#    del Scene.vrcft_shapekeys_41
-#    del Scene.vrcft_shapekeys_42
-#    del Scene.vrcft_shapekeys_43
-#    del Scene.vrcft_shapekeys_44
-#    del Scene.vrcft_shapekeys_45
-#    del Scene.vrcft_shapekeys_46
-#    del Scene.vrcft_shapekeys_47
-#    del Scene.vrcft_shapekeys_48
-#    del Scene.vrcft_shapekeys_49
-#    del Scene.vrcft_shapekeys_50
-#    del Scene.vrcft_shapekeys_51
-#    del Scene.vrcft_shapekeys_52
-#    del Scene.vrcft_shapekeys_53
-#    del Scene.vrcft_shapekeys_54
-#    del Scene.vrcft_shapekeys_55
-#    del Scene.vrcft_shapekeys_56
-#    del Scene.vrcft_shapekeys_57
-#    del Scene.vrcft_shapekeys_58 
-
     for i, ft_viseme in enumerate(FT_Visemes):
         delattr(Scene, "ft_viseme_" + str(i))
-    
-#    del Scene.vrcft_viseme_0
-#    del Scene.vrcft_viseme_1
-#    del Scene.vrcft_viseme_2
-#    del Scene.vrcft_viseme_3
-#    del Scene.vrcft_viseme_4
-#    del Scene.vrcft_viseme_5
-#    del Scene.vrcft_viseme_6
-#    del Scene.vrcft_viseme_7
-#    del Scene.vrcft_viseme_8
-#    del Scene.vrcft_viseme_9
-#    del Scene.vrcft_viseme_10
-#    del Scene.vrcft_viseme_11
-#    del Scene.vrcft_viseme_12
-#    del Scene.vrcft_viseme_13
-#    del Scene.vrcft_viseme_14  
+
+    for i, ft_viseme in enumerate(FT_Visemes):
+        delattr(Scene, "ft_viseme_int" + str(i))    
         
 if __name__ == "__main__":
     register()
