@@ -339,32 +339,34 @@ class FT_OT_CreateShapeKeys(Operator):
 
             for x in range(len(SRanipal_Labels)):
                 curr_key = eval("scene.ft_shapekey_" + str(x))
-                
-                #Check if blend with 'Basis' shape key
-                if curr_key == "Basis":
-                    #Check for duplicates
-                    if duplicate_shapekey(SRanipal_Labels[x]) == False :
-                        object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
-                    #Do not overwrite if the shape key exists and is on 'Basis'
-                        
-                else:                                     
-                    #Check for duplicates
-                    if duplicate_shapekey(SRanipal_Labels[x]) == False :
-                        # Find shapekey enterred and mix to create new shapekey
-                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
-                        object.data.shape_keys.key_blocks[curr_key].value = 1                      
-                        object.shape_key_add(name=SRanipal_Labels[x], from_mix=True)                        
-                    else:
-                        #Mix to existing shape key duplicate
-                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(SRanipal_Labels[x])
-                        object.data.shape_keys.key_blocks[curr_key].value = 1
-                        ops.object.mode_set(mode='EDIT', toggle=False)
-                        bpy.ops.mesh.select_mode(type="VERT")
-                        ops.mesh.select_all(action='SELECT')
-                        ops.mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
-                        self.report({'INFO'}, "Existing SRanipal face tracking shape key: " + SRanipal_Labels[x] + " has been overwritten with: " + curr_key)
-                    #Clear shape key weights    
-                    ops.object.shape_key_clear()
+                curr_key_enable = eval("scene.ft_shapekey_enable_" + str(x))
+                #Skip key if shape is disabled
+                if curr_key_enable == True:
+                    #Check if blend with 'Basis' shape key
+                    if curr_key == "Basis":
+                        #Check for duplicates
+                        if duplicate_shapekey(SRanipal_Labels[x]) == False :
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
+                        #Do not overwrite if the shape key exists and is on 'Basis'
+                            
+                    else:                                     
+                        #Check for duplicates
+                        if duplicate_shapekey(SRanipal_Labels[x]) == False :
+                            # Find shapekey enterred and mix to create new shapekey
+                            object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
+                            object.data.shape_keys.key_blocks[curr_key].value = 1                      
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=True)                        
+                        else:
+                            #Mix to existing shape key duplicate
+                            object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(SRanipal_Labels[x])
+                            object.data.shape_keys.key_blocks[curr_key].value = 1
+                            ops.object.mode_set(mode='EDIT', toggle=False)
+                            bpy.ops.mesh.select_mode(type="VERT")
+                            ops.mesh.select_all(action='SELECT')
+                            ops.mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
+                            self.report({'INFO'}, "Existing SRanipal face tracking shape key: " + SRanipal_Labels[x] + " has been overwritten with: " + curr_key)
+                        #Clear shape key weights    
+                        ops.object.shape_key_clear()
                                     
             self.report({'INFO'}, "SRanipal face tracking shapekeys have been created on mesh")
             
@@ -412,7 +414,6 @@ class FT_OT_CreateVisemes(Operator):
 
             for x in range(len(FT_Visemes)):
                 curr_key = eval("scene.ft_viseme_" + str(x))
-                
                 #Check if blend with 'Basis' shape key
                 if curr_key == "Basis":
                     #Check for duplicates
@@ -500,7 +501,8 @@ class FT_Shapes_UL(Panel):
                 row = col.row(align=True)
                 row.scale_y = 1.1
                 row.label(text = SRanipal_Labels[i] + ":")
-                row.prop(scene, 'ft_shapekey_' + str(i), icon='SHAPEKEY_DATA')                 
+                row.prop(scene, 'ft_shapekey_' + str(i), icon='SHAPEKEY_DATA')
+                row.prop(scene, 'ft_shapekey_enable_' + str(i), icon='CHECKMARK')                
             row = layout.row()
             row.operator("ft.create_shapekeys", icon='MESH_MONKEY')
         else:
@@ -584,9 +586,16 @@ def register():
     for i, ft_shape in enumerate(SRanipal_Labels):
         setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(
             name='',
-            description='Select shapekey to use for VRCFT',
+            description='Select shapekey to use for SRanipal',
             items=get_shapekeys_ft)
         )
+    # Enable Shape Key Creation
+    for i, ft_shape in enumerate(SRanipal_Labels):
+        setattr(Scene, "ft_shapekey_enable_" + str(i), BoolProperty(
+            name='',
+            description='Enable SRanipal Shapekey Creation',
+            default=True)
+        )    
     # Visemes
     for i, ft_viseme in enumerate(FT_Visemes):
         setattr(Scene, "ft_viseme_" + str(i), EnumProperty(
@@ -611,6 +620,9 @@ def unregister():
     
     for i, ft_shape in enumerate(SRanipal_Labels):
         delattr(Scene, "ft_shapekey_" + str(i))
+        
+    for i, ft_shape in enumerate(SRanipal_Lables):
+        delattr(Scene, "ft_shapekey_enable_" + str(i))
         
     for i, ft_viseme in enumerate(FT_Visemes):
         delattr(Scene, "ft_viseme_" + str(i))
