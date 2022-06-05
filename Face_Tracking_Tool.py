@@ -1,7 +1,7 @@
 bl_info = {
-    "name" : "Face Tracking Mapping Tool",
+    "name" : "Face Tracking Tool",
     "author" : "Adjerry91",
-    "version" : (2,0,0),
+    "version" : (2,0,1),
     "blender" : (3,1,2),
     "location" : "View3d > Tool",
     "warning" : "",
@@ -384,7 +384,7 @@ class FT_OT_CreateShapeKeys(Operator):
 
 class FT_OT_CreateVisemes(Operator):
     """Creates Face Tracking Visemes"""
-    bl_label = "Create Face Tracking Visemes (Reduced Visemes)"
+    bl_label = "Create Remapped Face Tracking Visemes"
     bl_idname = "ft.create_visemes"
 
     def execute(self, context):
@@ -459,7 +459,7 @@ class FT_OT_CreateVisemes(Operator):
 # -------------------------------------------------------------------
 
 class FT_Shapes_UL(Panel):
-    bl_label = "SRanipal Shape Key Mapping"
+    bl_label = "SRanipal Shape Key Remapping"
     bl_idname = "FT Shapes"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -512,7 +512,7 @@ class FT_Shapes_UL(Panel):
             col.separator()
 
 class FT_Visemes_UL(Panel):
-    bl_label = "FT Viseme Mapping"
+    bl_label = "Face Tracking Viseme Remapping"
     bl_idname = "FT Viseme"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
