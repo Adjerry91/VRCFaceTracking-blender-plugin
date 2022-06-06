@@ -624,6 +624,9 @@ class FT_Shapes_UL(Panel):
         col.separator()
         row = col.row(align=True)
         row.scale_y = 1.1
+        row.label(text="Create from Visemes:", icon='SHADERFX')
+        row = col.row(align=True)
+        row.scale_y = 1.1
         row.prop(scene, 'ft_aa', icon='SHAPEKEY_DATA')
         row = col.row(align=True)
         row.scale_y = 1.1
@@ -750,6 +753,39 @@ class FT_Visemes_UL(Panel):
             row.label(text='Select the mesh with face shape keys.', icon='INFO')
             col.separator()
 
+class FT_VersionInfo_UL(Panel):
+    bl_label = "Info"
+    bl_idname = "FT Info"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FT MAPPING"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        #Start Layout
+        col = layout.column()
+
+        #Version Info
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text=bl_info['name'] + ' v' + (".".join(str(n) for n in bl_info['version'])), icon="HEART")
+        col.separator()
+
+        #Credits
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="Created by " + bl_info['author'], icon="SOLO_ON")
+        col.separator()
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="Create from Visemes by Feilen", icon="SHADERFX")
+        col.separator()
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="With help from bernaclejames", icon="CHECKMARK")
+        col.separator()
 
 # -------------------------------------------------------------------
 # Register
@@ -759,7 +795,8 @@ classes = (
     FT_OT_CreateShapeKeys,
     FT_OT_CreateVisemes,
     FT_Shapes_UL,
-    FT_Visemes_UL
+    FT_Visemes_UL,
+    FT_VersionInfo_UL
 )
 
 def register():
