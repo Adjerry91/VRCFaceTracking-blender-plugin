@@ -807,9 +807,9 @@ def register():
     Scene.ft_mesh = EnumProperty(name='Mesh',description='Mesh to apply FT shape keys',items=get_meshes)
 
     # Viseme select
-    Scene.ft_aa = EnumProperty(name='aa',description='Select shapekey to use for FT',items=get_shapekeys_ft)
-    Scene.ft_ch = EnumProperty(name='ch',description='Select shapekey to use for FT',items=get_shapekeys_ft)
-    Scene.ft_oh = EnumProperty(name='oh',description='Select shapekey to use for FT',items=get_shapekeys_ft)
+    Scene.ft_aa = EnumProperty(name='aa/Jaw Down',description='This shapekey should ideally only move the mouth down.',items=get_shapekeys_ft)
+    Scene.ft_ch = EnumProperty(name='ch/Cheese',description='This shapekey should ideally only move the lips to expose the teeth.',items=get_shapekeys_ft)
+    Scene.ft_oh = EnumProperty(name='oh/Shock/aa/Jaw Down',description='This shapekey should move the bottom lips more than CH but not the top lips, and may need to be created. Often AA works too.',items=get_shapekeys_ft)
     Scene.ft_blink = EnumProperty(name='blink',description='Select shapekey to use for FT',items=get_shapekeys_ft)
     Scene.ft_smile = EnumProperty(name='smile',description='Select shapekey to use for FT',items=get_shapekeys_ft)
     Scene.ft_frown = EnumProperty(name='frown',description='Select shapekey to use for FT',items=get_shapekeys_ft)
