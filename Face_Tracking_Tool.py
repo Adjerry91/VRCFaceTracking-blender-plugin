@@ -11,6 +11,7 @@ bl_info = {
 
 import bpy
 import math
+import numpy as np
 
 from bpy.types import (Scene, Menu, Operator, Panel, PropertyGroup)
 from bpy.props import (BoolProperty, IntProperty, FloatProperty, StringProperty, BoolVectorProperty, EnumProperty, PointerProperty)
@@ -304,25 +305,25 @@ def has_shapekeys(mesh):
 
 # Returns [delta_v in 3 parts, by vert idx], and a bounding box (-x, +x, -y, +y, -z, +z)
 def get_shapekey_delta(mesh, shapekey_name):
-    deltas = []
     bounding_box = [math.inf, -math.inf, math.inf, -math.inf, math.inf, -math.inf]
 
     basis_key = mesh.data.shape_keys.key_blocks["Basis"]
+    basis_key_data = np.empty((len(basis_key.data), 3), dtype=np.float32)
+    basis_key.data.foreach_get("co", np.ravel(basis_key_data))
     active_key = mesh.data.shape_keys.key_blocks[shapekey_name]
-    for idx, vert in enumerate(basis_key.data):
-        delta = (active_key.data[idx].co[0] - vert.co[0],
-                active_key.data[idx].co[1] - vert.co[1],
-                active_key.data[idx].co[2] - vert.co[2])
-
-        deltas.append(delta)
+    active_key_data = np.empty((len(active_key.data), 3), dtype=np.float32)
+    active_key.data.foreach_get("co", np.ravel(active_key_data))
+    deltas = (active_key_data - basis_key_data)
+    absolute_difference = np.sum(np.abs(deltas), axis=1)
+    for idx, delta_total in enumerate(absolute_difference):
         # If this vertex moved any, adjust our bounding box
-        if (math.fabs(delta[0]) + math.fabs(delta[1]) + math.fabs(delta[2])) > 0.001:
-            bounding_box[0] = min(bounding_box[0], vert.co[0])
-            bounding_box[1] = max(bounding_box[1], vert.co[0])
-            bounding_box[2] = min(bounding_box[2], vert.co[1])
-            bounding_box[3] = max(bounding_box[3], vert.co[1])
-            bounding_box[4] = min(bounding_box[4], vert.co[2])
-            bounding_box[5] = max(bounding_box[5], vert.co[2])
+        if delta_total > 0.001:
+            bounding_box[0] = min(bounding_box[0], basis_key_data[idx][0])
+            bounding_box[1] = max(bounding_box[1], basis_key_data[idx][0])
+            bounding_box[2] = min(bounding_box[2], basis_key_data[idx][1])
+            bounding_box[3] = max(bounding_box[3], basis_key_data[idx][1])
+            bounding_box[4] = min(bounding_box[4], basis_key_data[idx][2])
+            bounding_box[5] = max(bounding_box[5], basis_key_data[idx][2])
 
     return deltas, bounding_box
 
@@ -372,6 +373,14 @@ class FT_OT_CreateShapeKeys(Operator):
             #Clear all existing values for shape keys
             ops.object.shape_key_clear()
 
+            basis_key = get_shapekeys_ft(self, context)[0][0]
+            basis_key_ref = object.data.shape_keys.key_blocks[basis_key]
+            basis_key_data = np.empty((len(basis_key_ref.data), 3), dtype=np.float32)
+            basis_key_ref.data.foreach_get("co", np.ravel(basis_key_data))
+            if context.scene.ft_ch != basis_key:
+                ch_deltas, bounding_box = get_shapekey_delta(object, context.scene.ft_ch)
+                crossfade_l = lambda f: crossfade(f, bounding_box[0], bounding_box[1], 0.2)
+                crossfade_factors = np.vectorize(crossfade_l)(basis_key_data[:, 0])
             for x in range(len(SRanipal_Labels)):
                 curr_key = eval("scene.ft_shapekey_" + str(x))
                 curr_key_enable = eval("scene.ft_shapekey_enable_" + str(x))
@@ -380,13 +389,14 @@ class FT_OT_CreateShapeKeys(Operator):
                     continue
                 # determine if we're going to be working with visemes
                 label = SRanipal_Labels[x]
-                basis_key = get_shapekeys_ft(self, context)[0][0]
                 generate_eyes = (any(string in label for string in ['Blink', 'squeeze', 'Wide']) and
                     context.scene.ft_blink != basis_key )
                 generate_jaw = (any(string in label for string in ['Jaw']) and context.scene.ft_aa != basis_key)
                 generate_mouth = (any(string in label for string in ['Upper_Up', 'Lower_Down', 'Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Inside', 'Pout', 'Mouth_Left', 'Mouth_Right']) and context.scene.ft_ch != basis_key and context.scene.ft_oh != basis_key)
                 generate_smile = (any(string in label for string in ['Smile']) and context.scene.ft_smile != basis_key)
                 generate_frown = (any(string in label for string in ['Sad']) and context.scene.ft_frown != basis_key)
+                if context.scene.ft_ch != basis_key:
+                    crossfade_arr = 1 - crossfade_factors if 'Left' in label else crossfade_factors
 
                 #Check if blend with 'Basis' shape key
                 if curr_key == "Basis" and not (generate_eyes or generate_jaw or generate_frown or generate_mouth or generate_smile):
@@ -407,87 +417,71 @@ class FT_OT_CreateShapeKeys(Operator):
                                 factor = 1.1
                             elif 'Wide' in label:
                                 factor = -0.15
-                            for idx, vert in enumerate(object.data.shape_keys.key_blocks[label].data):
-                                # No cross-fading for eyes
-                                if 'Left' in label and vert.co[0] < 0:
-                                    continue
-                                if 'Right' in label and vert.co[0] > 0:
-                                    continue
-                                object.data.shape_keys.key_blocks[label].data[idx].co[0] += (deltas[idx][0] * factor)
-                                object.data.shape_keys.key_blocks[label].data[idx].co[1] += (deltas[idx][1] * factor)
-                                object.data.shape_keys.key_blocks[label].data[idx].co[2] += (deltas[idx][2] * factor)
+                            if 'Left' in label:
+                                side_relevant = basis_key_data[:, 0] > 0
+                            if 'Right' in label:
+                                side_relevant = basis_key_data[:, 0] < 0
+                            deltas[~side_relevant] = 0.0
+                            object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(basis_key_data + (deltas * factor)))
                         elif generate_mouth:
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
-                            ch_deltas, bounding_box = get_shapekey_delta(object, context.scene.ft_ch)
                             oh_deltas, _ = get_shapekey_delta(object, context.scene.ft_oh)
                             # consider vertices where delta(v_ch) > delta(v_oh) upper lip, and vice versa
                             ch_should_be_greater = 'Upper' in label
                             both_lips = any(string in label for string in ['Pout', 'Mouth_Left', 'Mouth_Right'])
 
-                            for idx, vert in enumerate(object.data.shape_keys.key_blocks[label].data):
-                                ch_greater = (math.hypot(ch_deltas[idx][0], ch_deltas[idx][1], ch_deltas[idx][2])
-                                        > math.hypot(oh_deltas[idx][0], oh_deltas[idx][1], oh_deltas[idx][2]))
-                                if not both_lips:
-                                    if ch_greater and not ch_should_be_greater:
-                                        continue
-                                    elif not ch_greater and ch_should_be_greater:
-                                        continue
-                                if any(string in label for string in ['Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Mouth_Left', 'Mouth_Right']):
-                                    # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
-                                    multiplier = 1
-                                    if 'Right' in label:
-                                        multiplier = -1
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[0] -= (math.hypot(ch_deltas[idx][0], ch_deltas[idx][1], ch_deltas[idx][2]) * 0.75 * multiplier)
-                                elif any(string in label for string in ['Inside']):
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[1] += (math.hypot(ch_deltas[idx][0], ch_deltas[idx][1], ch_deltas[idx][1]) * 0.75 )
-                                elif any(string in label for string in ['Pout']):
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[1] -= (math.hypot(ch_deltas[idx][0], ch_deltas[idx][1], ch_deltas[idx][1]) * 0.75 )
+                            ch_greater = np.linalg.norm(ch_deltas, axis=1) > np.linalg.norm(oh_deltas, axis=1)
+                            lip_magnitude = np.linalg.norm(ch_deltas, axis=1)
+                            if not both_lips:
+                                if ch_should_be_greater:
+                                    lip_mask = ch_greater
                                 else:
-                                    crossfade_factor = crossfade(vert.co[0], bounding_box[0], bounding_box[1], 0.2)
-                                    if 'Left' in label:
-                                        crossfade_factor = 1 - crossfade_factor
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[0] += (ch_deltas[idx][0] * crossfade_factor)
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[1] += (ch_deltas[idx][1] * crossfade_factor)
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[2] += (ch_deltas[idx][2] * crossfade_factor)
+                                    lip_mask = ~ch_greater
+                                lip_magnitude[~lip_mask] = 0.0
+                            new_key = basis_key_data
+                            if any(string in label for string in ['Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Mouth_Left', 'Mouth_Right']):
+                                # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
+                                multiplier = 1
+                                if 'Right' in label:
+                                    multiplier = -1
+                                new_key[:, 0] -= lip_magnitude * 0.75 * multiplier
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            elif any(string in label for string in ['Inside']):
+                                new_key[:, 1] += lip_magnitude * 0.75
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            elif any(string in label for string in ['Pout']):
+                                new_key[:, 1] -= lip_magnitude * 0.75
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            else:
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((ch_deltas * crossfade_arr[:, None] * (lip_mask).astype(float)[:, None]) + basis_key_data))
                         elif generate_smile:
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
                             smile_deltas, _ = get_shapekey_delta(object, context.scene.ft_smile)
 
-                            for idx, vert in enumerate(object.data.shape_keys.key_blocks[label].data):
-                                crossfade_factor = crossfade(vert.co[0], bounding_box[0], bounding_box[1], 0.2)
-                                if 'Left' in label:
-                                    crossfade_factor = 1 - crossfade_factor
-                                object.data.shape_keys.key_blocks[label].data[idx].co[0] += (smile_deltas[idx][0] * crossfade_factor)
-                                object.data.shape_keys.key_blocks[label].data[idx].co[1] += (smile_deltas[idx][1] * crossfade_factor)
-                                object.data.shape_keys.key_blocks[label].data[idx].co[2] += (smile_deltas[idx][2] * crossfade_factor)
+                            object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((smile_deltas * crossfade_arr[:, None] + basis_key_data)))
                         elif generate_frown:
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
                             frown_deltas, _ = get_shapekey_delta(object, context.scene.ft_frown)
 
-                            for idx, vert in enumerate(object.data.shape_keys.key_blocks[label].data):
-                                crossfade_factor = crossfade(vert.co[0], bounding_box[0], bounding_box[1], 0.2)
-                                if 'Left' in label:
-                                    crossfade_factor = 1 - crossfade_factor
-                                object.data.shape_keys.key_blocks[label].data[idx].co[0] += (frown_deltas[idx][0] * crossfade_factor)
-                                object.data.shape_keys.key_blocks[label].data[idx].co[1] += (frown_deltas[idx][1] * crossfade_factor)
-                                object.data.shape_keys.key_blocks[label].data[idx].co[2] += (frown_deltas[idx][2] * crossfade_factor)
+                            object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((frown_deltas * crossfade_arr[:, None] + basis_key_data)))
                         elif generate_jaw:
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
                             aa_deltas, _ = get_shapekey_delta(object, context.scene.ft_aa)
+                            jaw_magnitude = np.linalg.norm(aa_deltas, axis=1)
 
-                            for idx, vert in enumerate(object.data.shape_keys.key_blocks[label].data):
-                                if any(string in label for string in ['Left', 'Right']):
-                                    # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
-                                    multiplier = 1
-                                    if 'Right' in label:
-                                        multiplier = -1
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[0] += (math.hypot(aa_deltas[idx][0], aa_deltas[idx][1], aa_deltas[idx][2]) * 0.75 * multiplier)
-                                elif any(string in label for string in ['Forward']):
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[1] -= (math.hypot(aa_deltas[idx][0], aa_deltas[idx][1], aa_deltas[idx][2]) * 0.5 )
-                                else:
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[0] += aa_deltas[idx][0] * 2.0
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[1] += aa_deltas[idx][1] * 2.0
-                                    object.data.shape_keys.key_blocks[label].data[idx].co[2] += aa_deltas[idx][2] * 2.0
+                            new_key = basis_key_data
+                            if any(string in label for string in ['Left', 'Right']):
+                                # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
+                                multiplier = 1
+                                if 'Right' in label:
+                                    multiplier = -1
+                                new_key[:, 0] -= jaw_magnitude * 0.75 * multiplier
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            elif any(string in label for string in ['Forward']):
+                                new_key[:, 1] -= jaw_magnitude * 0.5
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            else:
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(aa_deltas * 2.0 + basis_key_data))
                         else:
                             # Find shapekey enterred and mix to create new shapekey
                             object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
