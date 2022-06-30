@@ -11,6 +11,7 @@ bl_info = {
 
 import bpy
 import math
+import numpy as np
 
 from bpy.types import (Scene, Menu, Operator, Panel, PropertyGroup)
 from bpy.props import (BoolProperty, IntProperty, FloatProperty, StringProperty, BoolVectorProperty, EnumProperty, PointerProperty)
@@ -24,7 +25,7 @@ else:
     user_preferences = bpy.context.user_preferences
 
 # -------------------------------------------------------------------
-# SRanipal Facetracking Shapekey List   
+# SRanipal Facetracking Shapekey List
 # -------------------------------------------------------------------
 
 SRanipal_Labels = [
@@ -87,7 +88,7 @@ SRanipal_Labels = [
             "Tongue_UpRight_Morph",
             "Tongue_UpLeft_Morph",
             "Tongue_DownRight_Morph",
-            "Tongue_DownLeft_Morph",   
+            "Tongue_DownLeft_Morph",
         ]
 
 FT_Visemes = [
@@ -105,23 +106,23 @@ FT_Visemes = [
             "FT_EE",
             "FT_IH",
             "FT_OH",
-            "FT_OU", 
+            "FT_OU",
         ]
 
 # -------------------------------------------------------------------
-# Functions  
+# Functions
 # -------------------------------------------------------------------
 
 def duplicate_shapekey(string):
     active_object = bpy.context.active_object
-    
+
     #Check shape keys if duplicate
     if active_object.data.shape_keys.key_blocks.find(string) >= 0:
-        #print("Duplicate shape key found!")       
+        #print("Duplicate shape key found!")
         return True
-    else:          
+    else:
         return False
-    
+
 def version_2_79_or_older():
     return bpy.app.version < (2, 80)
 
@@ -139,7 +140,7 @@ def set_active(obj, skip_sel=False):
         bpy.context.scene.objects.active = obj
     else:
         bpy.context.view_layer.objects.active = obj
-        
+
 def select(obj, sel=True):
     if sel:
         hide(obj, False)
@@ -153,7 +154,7 @@ def hide(obj, val=True):
         obj.hide = val
     if not version_2_79_or_older():
         obj.hide_set(val)
-        
+
 def get_armature(armature_name=None):
     if not armature_name:
         armature_name = bpy.context.scene.armature
@@ -162,7 +163,7 @@ def get_armature(armature_name=None):
             if (armature_name and obj.name == armature_name) or not armature_name:
                 return obj
     return None
-    
+
 def get_meshes_objects(armature_name=None, mode=2, check=True, visible_only=False):
     # Modes:
     # 0 = With armatures only
@@ -237,7 +238,7 @@ def get_shapekeys(context, names, no_basis, decimation, return_list):
     if decimation:
         meshes = meshes_list
     elif meshes_list:
-        meshes = [get_objects().get(context.scene.ft_mesh)]  
+        meshes = [get_objects().get(context.scene.ft_mesh)]
     else:
         bpy.types.Object.Enum = choices
         return bpy.types.Object.Enum
@@ -302,10 +303,46 @@ def has_shapekeys(mesh):
         return False
     return hasattr(mesh.data.shape_keys, 'key_blocks')
 
+# Returns [delta_v in 3 parts, by vert idx], and a bounding box (-x, +x, -y, +y, -z, +z)
+def get_shapekey_delta(mesh, shapekey_name):
+    bounding_box = [math.inf, -math.inf, math.inf, -math.inf, math.inf, -math.inf]
+
+    basis_key = mesh.data.shape_keys.key_blocks["Basis"]
+    basis_key_data = np.empty((len(basis_key.data), 3), dtype=np.float32)
+    basis_key.data.foreach_get("co", np.ravel(basis_key_data))
+    active_key = mesh.data.shape_keys.key_blocks[shapekey_name]
+    active_key_data = np.empty((len(active_key.data), 3), dtype=np.float32)
+    active_key.data.foreach_get("co", np.ravel(active_key_data))
+    deltas = (active_key_data - basis_key_data)
+    absolute_difference = np.sum(np.abs(deltas), axis=1)
+    for idx, delta_total in enumerate(absolute_difference):
+        # If this vertex moved any, adjust our bounding box
+        if delta_total > 0.001:
+            bounding_box[0] = min(bounding_box[0], basis_key_data[idx][0])
+            bounding_box[1] = max(bounding_box[1], basis_key_data[idx][0])
+            bounding_box[2] = min(bounding_box[2], basis_key_data[idx][1])
+            bounding_box[3] = max(bounding_box[3], basis_key_data[idx][1])
+            bounding_box[4] = min(bounding_box[4], basis_key_data[idx][2])
+            bounding_box[5] = max(bounding_box[5], basis_key_data[idx][2])
+
+    return deltas, bounding_box
+
+# Map a range 0-1 where the middle e.g. 0.2x is linearly interpolated
+def crossfade(val, min_x, max_x, middle_percent):
+    val_norm = (val - min_x) / (max_x - min_x)
+    if val_norm < (.5 - (middle_percent / 2)):
+        # full
+        return 1
+    if val_norm > (.5 + (middle_percent / 2)):
+        # other side
+        return 0
+    else:
+        # middle, linear falloff
+        return 1 - ((val_norm - (.5 - (middle_percent / 2))) / middle_percent)
 
 # -------------------------------------------------------------------
-# Shape Key Operators    
-# -------------------------------------------------------------------    
+# Shape Key Operators
+# -------------------------------------------------------------------
 
 class FT_OT_CreateShapeKeys(Operator):
     """Creates SRanipal Facetracking Shape Keys"""
@@ -314,8 +351,8 @@ class FT_OT_CreateShapeKeys(Operator):
 
     def execute(self, context):
 
-        object = bpy.context.object        
-        scene = context.scene       
+        object = bpy.context.object
+        scene = context.scene
         ft_mesh = scene.ft_mesh
         active_object = bpy.context.active_object
         mesh = bpy.ops.mesh
@@ -326,57 +363,151 @@ class FT_OT_CreateShapeKeys(Operator):
         self.report({'INFO'}, "Selected mesh is: " + str(ft_mesh))
         set_active(mesh)
 
-
         #Check if there is shape keys on the mesh
-        if object.data.shape_keys: 
-            
+        if object.data.shape_keys:
+
             #Create beginning seperation marker for VRCFT Shape Keys
-            if duplicate_shapekey("~~ SRanipal Face Tracking ~~") == False :    
+            if duplicate_shapekey("~~ SRanipal Face Tracking ~~") == False :
                 object.shape_key_add(name="~~ SRanipal Face Tracking ~~", from_mix=False)
-                    
+
             #Clear all existing values for shape keys
             ops.object.shape_key_clear()
 
+            basis_key = get_shapekeys_ft(self, context)[0][0]
+            basis_key_ref = object.data.shape_keys.key_blocks[basis_key]
+            basis_key_data = np.empty((len(basis_key_ref.data), 3), dtype=np.float32)
+            basis_key_ref.data.foreach_get("co", np.ravel(basis_key_data))
+            if context.scene.ft_ch != basis_key:
+                ch_deltas, bounding_box = get_shapekey_delta(object, context.scene.ft_ch)
+                crossfade_l = lambda f: crossfade(f, bounding_box[0], bounding_box[1], 0.2)
+                crossfade_factors = np.vectorize(crossfade_l)(basis_key_data[:, 0])
             for x in range(len(SRanipal_Labels)):
                 curr_key = eval("scene.ft_shapekey_" + str(x))
                 curr_key_enable = eval("scene.ft_shapekey_enable_" + str(x))
                 #Skip key if shape is disabled
-                if curr_key_enable == True:
-                    #Check if blend with 'Basis' shape key
-                    if curr_key == "Basis":
-                        #Check for duplicates
-                        if duplicate_shapekey(SRanipal_Labels[x]) == False :
+                if not curr_key_enable:
+                    continue
+                # determine if we're going to be working with visemes
+                label = SRanipal_Labels[x]
+                generate_eyes = (any(string in label for string in ['Blink', 'squeeze', 'Wide']) and
+                    context.scene.ft_blink != basis_key )
+                generate_jaw = (any(string in label for string in ['Jaw']) and context.scene.ft_aa != basis_key)
+                generate_mouth = (any(string in label for string in ['Upper_Up', 'Lower_Down', 'Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Inside', 'Pout', 'Mouth_Left', 'Mouth_Right']) and context.scene.ft_ch != basis_key and context.scene.ft_oh != basis_key)
+                generate_smile = (any(string in label for string in ['Smile']) and context.scene.ft_smile != basis_key)
+                generate_frown = (any(string in label for string in ['Sad']) and context.scene.ft_frown != basis_key)
+                if context.scene.ft_ch != basis_key:
+                    crossfade_arr = 1 - crossfade_factors if 'Left' in label else crossfade_factors
+
+                #Check if blend with 'Basis' shape key
+                if curr_key == "Basis" and not (generate_eyes or generate_jaw or generate_frown or generate_mouth or generate_smile):
+                    #Check for duplicates
+                    if not duplicate_shapekey(SRanipal_Labels[x]):
+                        object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
+                    #Do not overwrite if the shape key exists and is on 'Basis'
+
+                else:
+                    #Check for duplicates
+                    if not duplicate_shapekey(SRanipal_Labels[x]):
+                        # Special handling for visemes
+                        if generate_eyes:
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
-                        #Do not overwrite if the shape key exists and is on 'Basis'
-                            
-                    else:                                     
-                        #Check for duplicates
-                        if duplicate_shapekey(SRanipal_Labels[x]) == False :
+                            deltas, _ = get_shapekey_delta(object, context.scene.ft_blink)
+                            factor = 1
+                            if 'squeeze' in label:
+                                factor = 1.1
+                            elif 'Wide' in label:
+                                factor = -0.15
+                            if 'Left' in label:
+                                side_relevant = basis_key_data[:, 0] > 0
+                            if 'Right' in label:
+                                side_relevant = basis_key_data[:, 0] < 0
+                            deltas[~side_relevant] = 0.0
+                            object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(basis_key_data + (deltas * factor)))
+                        elif generate_mouth:
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
+                            oh_deltas, _ = get_shapekey_delta(object, context.scene.ft_oh)
+                            # consider vertices where delta(v_ch) > delta(v_oh) upper lip, and vice versa
+                            ch_should_be_greater = 'Upper' in label
+                            both_lips = any(string in label for string in ['Pout', 'Mouth_Left', 'Mouth_Right'])
+
+                            ch_greater = np.linalg.norm(ch_deltas, axis=1) > np.linalg.norm(oh_deltas, axis=1)
+                            lip_magnitude = np.linalg.norm(ch_deltas, axis=1)
+                            if not both_lips:
+                                if ch_should_be_greater:
+                                    lip_mask = ch_greater
+                                else:
+                                    lip_mask = ~ch_greater
+                                lip_magnitude[~lip_mask] = 0.0
+                            new_key = basis_key_data
+                            if any(string in label for string in ['Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Mouth_Left', 'Mouth_Right']):
+                                # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
+                                multiplier = 1
+                                if 'Right' in label:
+                                    multiplier = -1
+                                new_key[:, 0] -= lip_magnitude * 0.75 * multiplier
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            elif any(string in label for string in ['Inside']):
+                                new_key[:, 1] += lip_magnitude * 0.75
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            elif any(string in label for string in ['Pout']):
+                                new_key[:, 1] -= lip_magnitude * 0.75
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            else:
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((ch_deltas * crossfade_arr[:, None] * (lip_mask).astype(float)[:, None]) + basis_key_data))
+                        elif generate_smile:
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
+                            smile_deltas, _ = get_shapekey_delta(object, context.scene.ft_smile)
+
+                            object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((smile_deltas * crossfade_arr[:, None] + basis_key_data)))
+                        elif generate_frown:
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
+                            frown_deltas, _ = get_shapekey_delta(object, context.scene.ft_frown)
+
+                            object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((frown_deltas * crossfade_arr[:, None] + basis_key_data)))
+                        elif generate_jaw:
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
+                            aa_deltas, _ = get_shapekey_delta(object, context.scene.ft_aa)
+                            jaw_magnitude = np.linalg.norm(aa_deltas, axis=1)
+
+                            new_key = basis_key_data
+                            if any(string in label for string in ['Left', 'Right']):
+                                # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
+                                multiplier = 1
+                                if 'Right' in label:
+                                    multiplier = -1
+                                new_key[:, 0] -= jaw_magnitude * 0.75 * multiplier
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            elif any(string in label for string in ['Forward']):
+                                new_key[:, 1] -= jaw_magnitude * 0.5
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
+                            else:
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(aa_deltas * 2.0 + basis_key_data))
+                        else:
                             # Find shapekey enterred and mix to create new shapekey
                             object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
-                            object.data.shape_keys.key_blocks[curr_key].value = 1                      
-                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=True)                        
-                        else:
-                            #Mix to existing shape key duplicate
-                            object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(SRanipal_Labels[x])
                             object.data.shape_keys.key_blocks[curr_key].value = 1
-                            ops.object.mode_set(mode='EDIT', toggle=False)
-                            bpy.ops.mesh.select_mode(type="VERT")
-                            ops.mesh.select_all(action='SELECT')
-                            ops.mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
-                            self.report({'INFO'}, "Existing SRanipal face tracking shape key: " + SRanipal_Labels[x] + " has been overwritten with: " + curr_key)
-                        #Clear shape key weights    
-                        ops.object.shape_key_clear()
-                                    
+                            object.shape_key_add(name=SRanipal_Labels[x], from_mix=True)
+                    else:
+                        #Mix to existing shape key duplicate
+                        object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(SRanipal_Labels[x])
+                        object.data.shape_keys.key_blocks[curr_key].value = 1
+                        ops.object.mode_set(mode='EDIT', toggle=False)
+                        bpy.ops.mesh.select_mode(type="VERT")
+                        ops.mesh.select_all(action='SELECT')
+                        ops.mesh.blend_from_shape(shape=curr_key, blend=1.0, add=False)
+                        self.report({'INFO'}, "Existing SRanipal face tracking shape key: " + SRanipal_Labels[x] + " has been overwritten with: " + curr_key)
+                    #Clear shape key weights
+                    ops.object.shape_key_clear()
+
             self.report({'INFO'}, "SRanipal face tracking shapekeys have been created on mesh")
-            
-                
+
+
             #Cleanup mode state
             ops.object.mode_set(mode='OBJECT', toggle=False)
-            
+
             #Move active shape to 'Basis'
             active_object.active_shape_key_index = 0
-                
+
         else:
             #Error message if basis does not exist
             self.report({'WARNING'}, "No shape keys found on mesh")
@@ -389,8 +520,8 @@ class FT_OT_CreateVisemes(Operator):
 
     def execute(self, context):
 
-        object = bpy.context.object        
-        scene = context.scene       
+        object = bpy.context.object
+        scene = context.scene
         ft_mesh = scene.ft_mesh
         active_object = bpy.context.active_object
         mesh = bpy.ops.mesh
@@ -403,12 +534,12 @@ class FT_OT_CreateVisemes(Operator):
 
 
         #Check if there is shape keys on the mesh
-        if object.data.shape_keys: 
-            
+        if object.data.shape_keys:
+
             #Create beginning seperation marker for Viseme Shape Keys
-            if duplicate_shapekey("~~ Face Tracking Visemes ~~") == False :    
+            if duplicate_shapekey("~~ Face Tracking Visemes ~~") == False :
                 object.shape_key_add(name="~~ Face Tracking Visemes ~~", from_mix=False)
-                    
+
             #Clear all existing values for shape keys
             ops.object.shape_key_clear()
 
@@ -420,14 +551,14 @@ class FT_OT_CreateVisemes(Operator):
                     if duplicate_shapekey(FT_Visemes[x]) == False :
                         object.shape_key_add(name=FT_Visemes[x], from_mix=False)
                     #Do not overwrite if the shape key exists and is on 'Basis'
-                        
-                else:                                     
+
+                else:
                     #Check for duplicates
                     if duplicate_shapekey(FT_Visemes[x]) == False :
                         # Find shapekey enterred and mix to create new shapekey
                         object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(curr_key)
-                        object.data.shape_keys.key_blocks[curr_key].value = eval('scene.ft_viseme_int_' + str(x))                     
-                        object.shape_key_add(name=FT_Visemes[x], from_mix=True)                        
+                        object.data.shape_keys.key_blocks[curr_key].value = eval('scene.ft_viseme_int_' + str(x))
+                        object.shape_key_add(name=FT_Visemes[x], from_mix=True)
                     else:
                         #Mix to existing shape key duplicate
                         object.active_shape_key_index = active_object.data.shape_keys.key_blocks.find(FT_Visemes[x])
@@ -437,25 +568,25 @@ class FT_OT_CreateVisemes(Operator):
                         ops.mesh.select_all(action='SELECT')
                         ops.mesh.blend_from_shape(shape=curr_key, blend=1, add=False)
                         self.report({'INFO'}, "Existing SRanipal Viseme shape key: " + FT_Visemes[x] + " has been overwritten with: " + curr_key)
-                    #Clear shape key weights    
+                    #Clear shape key weights
                     ops.object.shape_key_clear()
-                                     
+
             self.report({'INFO'}, "SRanipal face tracking shapekeys have been created on mesh")
-            
-                
+
+
             #Cleanup mode state
             ops.object.mode_set(mode='OBJECT', toggle=False)
-            
+
             #Move active shape to 'Basis'
             active_object.active_shape_key_index = 0
-                
+
         else:
             #Error message if basis does not exist
             self.report({'WARNING'}, "No shape keys found on mesh")
         return{'FINISHED'}
 
 # -------------------------------------------------------------------
-# User Interface  
+# User Interface
 # -------------------------------------------------------------------
 
 class FT_Shapes_UL(Panel):
@@ -470,28 +601,60 @@ class FT_Shapes_UL(Panel):
         scene = context.scene
         ft_mesh = scene.ft_mesh
         object = bpy.context.object
-        
+
         #Start Layout
         col = layout.column()
-        
+
         #Mesh Selection
         mesh = get_objects()[ft_mesh]
-        mesh_count = len(get_meshes_objects(check=False, mode=2))     
+        mesh_count = len(get_meshes_objects(check=False, mode=2))
         row = col.row(align=True)
         row.scale_y = 1.1
         row.prop(context.scene, 'ft_mesh', icon='MESH_DATA')
-        col.separator()                       
+        col.separator()
         row = col.row(align=True)
-        
-        #Check mesh selections        
+
+        #Viseme Selection
+        col.separator()
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="Create from Visemes:", icon='SHADERFX')
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(scene, 'ft_aa', icon='SHAPEKEY_DATA')
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(scene, 'ft_ch', icon='SHAPEKEY_DATA')
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(scene, 'ft_oh', icon='SHAPEKEY_DATA')
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(scene, 'ft_blink', icon='SHAPEKEY_DATA')
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(scene, 'ft_smile', icon='SHAPEKEY_DATA')
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.prop(scene, 'ft_frown', icon='SHAPEKEY_DATA')
+
+        #Check mesh selections
         if ft_mesh and has_shapekeys(mesh):
             #Info
-            
+
             row = col.row(align=True)
             row.scale_y = 1.1
-            row.label(text='Select shape keys to create SRanipal Shape Keys.', icon='INFO')
+            row.label(text='Select shape keys to create FT shape keys.', icon='INFO')
             col.separator()
-            
+            row = col.row(align=True)
+            row.scale_y = 1.1
+            row.label(text='Specifying above will attempt to create them for you.', icon='INFO')
+            col.separator()
+            row = col.row(align=True)
+            row.scale_y = 1.1
+            row.label(text='Currently requires rotation to be applied.', icon='INFO')
+            col.separator()
+
             #Start Box
             box = layout.box()
             col = box.column(align=True)
@@ -502,7 +665,27 @@ class FT_Shapes_UL(Panel):
                 row.scale_y = 1.1
                 row.label(text = SRanipal_Labels[i] + ":")
                 row.prop(scene, 'ft_shapekey_' + str(i), icon='SHAPEKEY_DATA')
-                row.prop(scene, 'ft_shapekey_enable_' + str(i), icon='CHECKMARK')                
+                row.prop(scene, 'ft_shapekey_enable_' + str(i), icon='CHECKMARK')
+                # Determine whether this key is already going to be auto-populated
+                label = SRanipal_Labels[i]
+                basis = get_shapekeys_ft(self, context)[0][0]
+                if any(string in label for string in ['Blink', 'squeeze', 'Wide']):
+                    if context.scene.ft_blink != basis:
+                        row.enabled = False
+                if any(string in label for string in ['Jaw']):
+                    if context.scene.ft_aa != basis:
+                        row.enabled = False
+                if any(string in label for string in ['Upper_Up', 'Lower_Down', 'Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Inside', 'Pout', 'Mouth_Left', 'Mouth_Right', 'Smile', 'Sad']):
+                    if (context.scene.ft_ch != basis and
+                        context.scene.ft_oh != basis):
+                        row.enabled = False
+                if any(string in label for string in ['Smile']):
+                    if context.scene.ft_smile != basis:
+                        row.enabled = False
+                if any(string in label for string in ['Sad']):
+                    if context.scene.ft_frown != basis:
+                        row.enabled = False
+
             row = layout.row()
             row.operator("ft.create_shapekeys", icon='MESH_MONKEY')
         else:
@@ -517,54 +700,87 @@ class FT_Visemes_UL(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "FT MAPPING"
-    
+
     def draw(self, context):
         layout = self.layout
         scene = context.scene
         ft_mesh = scene.ft_mesh
         object = bpy.context.object
-        
+
         #Start Layout
         col = layout.column()
-        
+
         #Mesh Selection
         mesh = get_objects()[ft_mesh]
-        mesh_count = len(get_meshes_objects(check=False, mode=2))     
+        mesh_count = len(get_meshes_objects(check=False, mode=2))
         row = col.row(align=True)
         row.scale_y = 1.1
         row.prop(context.scene, 'ft_mesh', icon='MESH_DATA')
-        col.separator()                       
+        col.separator()
         row = col.row(align=True)
-        
-        #Check mesh selections        
+
+        #Check mesh selections
         if ft_mesh and has_shapekeys(mesh):
-            
+
             #Info
             row = col.row(align=True)
             row.scale_y = 1.1
             row.label(text='Select shape keys to create visemes.', icon='INFO')
             col.separator()
-            
+
             #Start Box
             box = layout.box()
             col = box.column(align=True)
-            
+
             #Start List of Shapekeys from VRCFT labels list
             for i in range(len(FT_Visemes)):
                 row = col.row(align=True)
                 row.scale_y = 1.1
                 row.label(text = FT_Visemes[i] + ":")
                 row.prop(scene, 'ft_viseme_' + str(i), icon='SHAPEKEY_DATA')
-                row.prop(scene, 'ft_viseme_int_' + str(i))                 
-            row = layout.row()   
-            row.operator("ft.create_visemes", icon='MESH_MONKEY')           
+                row.prop(scene, 'ft_viseme_int_' + str(i))
+            row = layout.row()
+            row.operator("ft.create_visemes", icon='MESH_MONKEY')
         else:
             row = col.row(align=True)
             row.scale_y = 1.1
             row.label(text='Select the mesh with face shape keys.', icon='INFO')
             col.separator()
-                    
-        
+
+class FT_VersionInfo_UL(Panel):
+    bl_label = "Info"
+    bl_idname = "FT Info"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FT MAPPING"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        #Start Layout
+        col = layout.column()
+
+        #Version Info
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text=bl_info['name'] + ' v' + (".".join(str(n) for n in bl_info['version'])), icon="HEART")
+        col.separator()
+
+        #Credits
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="Created by " + bl_info['author'], icon="SOLO_ON")
+        col.separator()
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="Create from Visemes by Feilen", icon="SHADERFX")
+        col.separator()
+        row = col.row(align=True)
+        row.scale_y = 1.1
+        row.label(text="With help from bernaclejames", icon="CHECKMARK")
+        col.separator()
+
 # -------------------------------------------------------------------
 # Register
 # -------------------------------------------------------------------
@@ -573,15 +789,25 @@ classes = (
     FT_OT_CreateShapeKeys,
     FT_OT_CreateVisemes,
     FT_Shapes_UL,
-    FT_Visemes_UL
+    FT_Visemes_UL,
+    FT_VersionInfo_UL
 )
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-     
+
     # Mesh Select
     Scene.ft_mesh = EnumProperty(name='Mesh',description='Mesh to apply FT shape keys',items=get_meshes)
+
+    # Viseme select
+    Scene.ft_aa = EnumProperty(name='aa/Jaw Down',description='This shapekey should ideally only move the mouth down.',items=get_shapekeys_ft)
+    Scene.ft_ch = EnumProperty(name='ch/Cheese',description='This shapekey should ideally only move the lips to expose the teeth.',items=get_shapekeys_ft)
+    Scene.ft_oh = EnumProperty(name='oh/Shock/aa/Jaw Down',description='This shapekey should move the bottom lips more than CH but not the top lips, and may need to be created. Often AA works too.',items=get_shapekeys_ft)
+    Scene.ft_blink = EnumProperty(name='blink',description='Select shapekey to use for FT',items=get_shapekeys_ft)
+    Scene.ft_smile = EnumProperty(name='smile',description='Select shapekey to use for FT',items=get_shapekeys_ft)
+    Scene.ft_frown = EnumProperty(name='frown',description='Select shapekey to use for FT',items=get_shapekeys_ft)
+
     # Shape Keys
     for i, ft_shape in enumerate(SRanipal_Labels):
         setattr(Scene, "ft_shapekey_" + str(i), EnumProperty(
@@ -595,7 +821,7 @@ def register():
             name='',
             description='Enable SRanipal Shapekey Creation',
             default=True)
-        )    
+        )
     # Visemes
     for i, ft_viseme in enumerate(FT_Visemes):
         setattr(Scene, "ft_viseme_" + str(i), EnumProperty(
@@ -616,19 +842,19 @@ def register():
 
 def unregister():
     for cls in classes:
-        bpy.utils.unregister_class(cls) 
-    
+        bpy.utils.unregister_class(cls)
+
     for i, ft_shape in enumerate(SRanipal_Labels):
         delattr(Scene, "ft_shapekey_" + str(i))
-        
+
     for i, ft_shape in enumerate(SRanipal_Lables):
         delattr(Scene, "ft_shapekey_enable_" + str(i))
-        
+
     for i, ft_viseme in enumerate(FT_Visemes):
         delattr(Scene, "ft_viseme_" + str(i))
 
     for i, ft_viseme in enumerate(FT_Visemes):
-        delattr(Scene, "ft_viseme_int" + str(i))    
-        
+        delattr(Scene, "ft_viseme_int" + str(i))
+
 if __name__ == "__main__":
     register()
