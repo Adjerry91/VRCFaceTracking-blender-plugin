@@ -642,8 +642,10 @@ class FT_OT_CreateShapeKeys(Operator):
                             elif 'Pout' in label:
                                 new_key[:, 1] -= lip_magnitude * 0.75
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
-                            else:
+                            elif label in VISEME_rightside or label in VISEME_leftside:
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((ch_deltas * crossfade_arr[:, None] * (lip_mask).astype(float)[:, None]) + basis_key_data))
+                            else:
+                                object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel((ch_deltas * (lip_mask).astype(float)[:, None]) + basis_key_data))
                         elif generate_smile:
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
                             smile_deltas, _ = get_shapekey_delta(object, context.scene.ft_smile)
