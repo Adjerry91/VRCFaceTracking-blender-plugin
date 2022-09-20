@@ -109,6 +109,194 @@ FT_Visemes = [
             "FT_OU",
         ]
 
+# Keys which need the left/right halves to be sharply divided
+VISEME_sharp_onesided = {
+    "Eye_Left_squeeze",
+    "Eye_Right_squeeze",
+    "Eye_Left_Blink",
+    "Eye_Left_Right",
+    "Eye_Left_Left",
+    "Eye_Left_Down",
+    "Eye_Left_Up",
+    "Eye_Right_Blink",
+    "Eye_Right_Right",
+    "Eye_Right_Left",
+    "Eye_Right_Down",
+    "Eye_Right_Up",
+    "Eye_Left_Wide",
+    "Eye_Right_Wide",
+    "Eye_Left_Dilation",
+    "Eye_Left_Constrict",
+    "Eye_Right_Dilation",
+    "Eye_Right_Constrict",
+}
+
+# Keys which need the left/right halves to be smoothly interpolated in the middle
+VISEME_smooth_onesided = {
+    "Mouth_Left",
+    "Mouth_Right",
+    "Mouth_Upper_Right",
+    "Mouth_Upper_Left",
+    "Mouth_Lower_Right",
+    "Mouth_Lower_Left",
+    "Mouth_Smile_Right",
+    "Mouth_Smile_Left",
+    "Mouth_Sad_Right",
+    "Mouth_Sad_Left",
+    "Cheek_Puff_Right",
+    "Cheek_Puff_Left",
+    "Mouth_Upper_UpRight",
+    "Mouth_Upper_UpLeft",
+    "Mouth_Lower_DownRight",
+    "Mouth_Lower_DownLeft",
+}
+
+# Keys which rely on displacing vertices by some calculated magnitude in another direction
+VISEME_displace = {
+    "Jaw_Right",
+    "Jaw_Left",
+    "Jaw_Forward",
+    "Mouth_Left",
+    "Mouth_Right",
+    "Mouth_Upper_Right",
+    "Mouth_Upper_Left",
+    "Mouth_Lower_Right",
+    "Mouth_Lower_Left",
+    "Mouth_Pout",
+    "Mouth_Upper_Overturn",
+    "Mouth_Lower_Overturn",
+    "Mouth_Upper_Inside",
+    "Mouth_Lower_Inside",
+}
+
+# Further narrowing it down, keys which displace left or right
+VISEME_displace_left_right = {
+    "Jaw_Right",
+    "Jaw_Left",
+    "Mouth_Left",
+    "Mouth_Right",
+    "Mouth_Upper_Right",
+    "Mouth_Upper_Left",
+    "Mouth_Lower_Right",
+    "Mouth_Lower_Left",
+}
+
+VISEME_jaw = {
+    "Jaw_Right",
+    "Jaw_Left",
+    "Jaw_Forward",
+    "Jaw_Open",
+}
+
+VISEME_eye = {
+    "Eye_Left_squeeze",
+    "Eye_Right_squeeze",
+    "Eye_Left_Blink",
+#    "Eye_Left_Right",
+#    "Eye_Left_Left",
+#    "Eye_Left_Down",
+#    "Eye_Left_Up",
+    "Eye_Right_Blink",
+#    "Eye_Right_Right",
+#    "Eye_Right_Left",
+#    "Eye_Right_Down",
+#    "Eye_Right_Up",
+    "Eye_Left_Wide",
+    "Eye_Right_Wide",
+#    "Eye_Left_Dilation",
+#    "Eye_Left_Constrict",
+#    "Eye_Right_Dilation",
+#    "Eye_Right_Constrict",
+}
+
+VISEME_mouth = {
+#    "Mouth_Ape_Shape",
+    "Mouth_Left",
+    "Mouth_Right",
+    "Mouth_Upper_Right",
+    "Mouth_Upper_Left",
+    "Mouth_Lower_Right",
+    "Mouth_Lower_Left",
+    "Mouth_Pout",
+    "Mouth_Upper_Up",
+    "Mouth_Lower_Down",
+    "Mouth_Upper_UpRight",
+    "Mouth_Upper_UpLeft",
+    "Mouth_Lower_DownRight",
+    "Mouth_Lower_DownLeft",
+#    "Mouth_O_Shape",
+#    "Mouth_Upper_Overturn",
+#    "Mouth_Lower_Overturn",
+    "Mouth_Upper_Inside",
+    "Mouth_Lower_Inside",
+#    "Mouth_Lower_Overlay",
+}
+
+# Specifically keys which deal with the left half of the face, /not/ moving left
+VISEME_leftside = {
+    "Eye_Left_squeeze",
+    "Eye_Left_Blink",
+    "Eye_Left_Right",
+    "Eye_Left_Left",
+    "Eye_Left_Down",
+    "Eye_Left_Up",
+    "Eye_Right_Left",
+    "Eye_Left_Wide",
+    "Eye_Left_Dilation",
+    "Eye_Left_Constrict",
+    "Mouth_Smile_Left",
+    "Mouth_Sad_Left",
+    "Cheek_Puff_Left",
+    "Mouth_Upper_UpLeft",
+    "Mouth_Lower_DownLeft",
+}
+# Vice versa.
+VISEME_rightside = {
+    "Eye_Right_squeeze",
+    "Eye_Left_Right",
+    "Eye_Right_Blink",
+    "Eye_Right_Right",
+    "Eye_Right_Left",
+    "Eye_Right_Down",
+    "Eye_Right_Up",
+    "Eye_Right_Wide",
+    "Eye_Right_Dilation",
+    "Eye_Right_Constrict",
+    "Mouth_Smile_Right",
+    "Mouth_Sad_Right",
+    "Cheek_Puff_Right",
+    "Mouth_Upper_UpRight",
+    "Mouth_Lower_DownRight",
+}
+
+VISEME_bothlips = {
+    "Mouth_Ape_Shape",
+    "Mouth_Left",
+    "Mouth_Right",
+    "Mouth_Pout",
+    "Mouth_O_Shape",
+}
+
+VISEME_upperlip = {
+    "Mouth_Upper_Right",
+    "Mouth_Upper_Left",
+    "Mouth_Upper_Up",
+    "Mouth_Upper_UpRight",
+    "Mouth_Upper_UpLeft",
+    "Mouth_Upper_Overturn",
+    "Mouth_Upper_Inside",
+}
+
+VISEME_frown = {
+    "Mouth_Sad_Right",
+    "Mouth_Sad_Left",
+}
+
+VISEME_smile = {
+    "Mouth_Smile_Right",
+    "Mouth_Smile_Left",
+}
+
 # -------------------------------------------------------------------
 # Functions
 # -------------------------------------------------------------------
@@ -380,7 +568,7 @@ class FT_OT_CreateShapeKeys(Operator):
             if context.scene.ft_ch != basis_key:
                 ch_deltas, bounding_box = get_shapekey_delta(object, context.scene.ft_ch)
                 crossfade_l = lambda f: crossfade(f, bounding_box[0], bounding_box[1], 0.2)
-                crossfade_factors = np.vectorize(crossfade_l)(basis_key_data[:, 0])
+                crossfade_factors = np.vectorize(crossfade_l, otypes=[np.float32])(basis_key_data[:, 0])
             for x in range(len(SRanipal_Labels)):
                 curr_key = eval("scene.ft_shapekey_" + str(x))
                 curr_key_enable = eval("scene.ft_shapekey_enable_" + str(x))
@@ -389,14 +577,16 @@ class FT_OT_CreateShapeKeys(Operator):
                     continue
                 # determine if we're going to be working with visemes
                 label = SRanipal_Labels[x]
-                generate_eyes = (any(string in label for string in ['Blink', 'squeeze', 'Wide']) and
-                    context.scene.ft_blink != basis_key )
-                generate_jaw = (any(string in label for string in ['Jaw']) and context.scene.ft_aa != basis_key)
-                generate_mouth = (any(string in label for string in ['Upper_Up', 'Lower_Down', 'Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Inside', 'Pout', 'Mouth_Left', 'Mouth_Right']) and context.scene.ft_ch != basis_key and context.scene.ft_oh != basis_key)
-                generate_smile = (any(string in label for string in ['Smile']) and context.scene.ft_smile != basis_key)
-                generate_frown = (any(string in label for string in ['Sad']) and context.scene.ft_frown != basis_key)
+                generate_eyes = label in VISEME_eye and context.scene.ft_blink != basis_key
+                generate_jaw = label in VISEME_jaw and context.scene.ft_aa != basis_key
+                generate_mouth = label in VISEME_mouth and context.scene.ft_ch != basis_key and context.scene.ft_oh != basis_key
+                generate_smile = label in VISEME_smile and context.scene.ft_smile != basis_key
+                generate_frown = label in VISEME_frown and context.scene.ft_frown != basis_key
+                # we should only be doing one
+                def nand(a,b): return not (a and b)
+                assert (generate_eyes + generate_jaw + generate_mouth + generate_smile + generate_frown) < 2, 'generate_eyes:{}, generate_jaw:{}, generate_mouth:{}, generate_smile:{}, generate_frown:{}'.format(generate_eyes, generate_jaw, generate_mouth, generate_smile, generate_frown)
                 if context.scene.ft_ch != basis_key:
-                    crossfade_arr = 1 - crossfade_factors if 'Left' in label else crossfade_factors
+                    crossfade_arr = (1 - crossfade_factors) if (label in VISEME_leftside) else np.copy(crossfade_factors)
 
                 #Check if blend with 'Basis' shape key
                 if curr_key == "Basis" and not (generate_eyes or generate_jaw or generate_frown or generate_mouth or generate_smile):
@@ -417,9 +607,9 @@ class FT_OT_CreateShapeKeys(Operator):
                                 factor = 1.1
                             elif 'Wide' in label:
                                 factor = -0.15
-                            if 'Left' in label:
+                            if label in VISEME_leftside:
                                 side_relevant = basis_key_data[:, 0] > 0
-                            if 'Right' in label:
+                            if label in VISEME_rightside:
                                 side_relevant = basis_key_data[:, 0] < 0
                             deltas[~side_relevant] = 0.0
                             object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(basis_key_data + (deltas * factor)))
@@ -427,8 +617,8 @@ class FT_OT_CreateShapeKeys(Operator):
                             object.shape_key_add(name=SRanipal_Labels[x], from_mix=False)
                             oh_deltas, _ = get_shapekey_delta(object, context.scene.ft_oh)
                             # consider vertices where delta(v_ch) > delta(v_oh) upper lip, and vice versa
-                            ch_should_be_greater = 'Upper' in label
-                            both_lips = any(string in label for string in ['Pout', 'Mouth_Left', 'Mouth_Right'])
+                            ch_should_be_greater = label in VISEME_upperlip
+                            both_lips = label in VISEME_bothlips
 
                             ch_greater = np.linalg.norm(ch_deltas, axis=1) > np.linalg.norm(oh_deltas, axis=1)
                             lip_magnitude = np.linalg.norm(ch_deltas, axis=1)
@@ -438,18 +628,18 @@ class FT_OT_CreateShapeKeys(Operator):
                                 else:
                                     lip_mask = ~ch_greater
                                 lip_magnitude[~lip_mask] = 0.0
-                            new_key = basis_key_data
-                            if any(string in label for string in ['Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Mouth_Left', 'Mouth_Right']):
+                            new_key = np.copy(basis_key_data)
+                            if label in VISEME_displace_left_right:
                                 # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
                                 multiplier = 1
                                 if 'Right' in label:
                                     multiplier = -1
                                 new_key[:, 0] -= lip_magnitude * 0.75 * multiplier
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
-                            elif any(string in label for string in ['Inside']):
+                            elif 'Inside' in label:
                                 new_key[:, 1] += lip_magnitude * 0.75
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
-                            elif any(string in label for string in ['Pout']):
+                            elif 'Pout' in label:
                                 new_key[:, 1] -= lip_magnitude * 0.75
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
                             else:
@@ -469,15 +659,13 @@ class FT_OT_CreateShapeKeys(Operator):
                             aa_deltas, _ = get_shapekey_delta(object, context.scene.ft_aa)
                             jaw_magnitude = np.linalg.norm(aa_deltas, axis=1)
 
-                            new_key = basis_key_data
-                            if any(string in label for string in ['Left', 'Right']):
+                            new_key = np.copy(basis_key_data)
+                            if label in VISEME_displace_left_right:
                                 # instead of blending, we take the magnitude of movement * .1 and direct it to the left/right
-                                multiplier = 1
-                                if 'Right' in label:
-                                    multiplier = -1
+                                multiplier = -1 if 'Right' in label else 1
                                 new_key[:, 0] -= jaw_magnitude * 0.75 * multiplier
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
-                            elif any(string in label for string in ['Forward']):
+                            elif 'Forward' in label:
                                 new_key[:, 1] -= jaw_magnitude * 0.5
                                 object.data.shape_keys.key_blocks[label].data.foreach_set("co", np.ravel(new_key))
                             else:
@@ -669,20 +857,20 @@ class FT_Shapes_UL(Panel):
                 # Determine whether this key is already going to be auto-populated
                 label = SRanipal_Labels[i]
                 basis = get_shapekeys_ft(self, context)[0][0]
-                if any(string in label for string in ['Blink', 'squeeze', 'Wide']):
+                if label in VISEME_eye:
                     if context.scene.ft_blink != basis:
                         row.enabled = False
-                if any(string in label for string in ['Jaw']):
+                if label in VISEME_jaw:
                     if context.scene.ft_aa != basis:
                         row.enabled = False
-                if any(string in label for string in ['Upper_Up', 'Lower_Down', 'Upper_Left', 'Lower_Right', 'Upper_Right', 'Lower_Left', 'Inside', 'Pout', 'Mouth_Left', 'Mouth_Right', 'Smile', 'Sad']):
+                if label in VISEME_mouth:
                     if (context.scene.ft_ch != basis and
                         context.scene.ft_oh != basis):
                         row.enabled = False
-                if any(string in label for string in ['Smile']):
+                if label in VISEME_smile:
                     if context.scene.ft_smile != basis:
                         row.enabled = False
-                if any(string in label for string in ['Sad']):
+                if label in VISEME_frown:
                     if context.scene.ft_frown != basis:
                         row.enabled = False
 
